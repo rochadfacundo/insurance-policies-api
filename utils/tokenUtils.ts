@@ -1,11 +1,9 @@
 
 import fs from "fs";
 import path from "path";
+import { TokenData } from "../models/tokenData";
 
-export interface TokenData {
-    access_token: string;
-    refresh_token?: string;
-}
+
 
 const TOKENS_DIR = path.resolve(__dirname,"../tokens");
 

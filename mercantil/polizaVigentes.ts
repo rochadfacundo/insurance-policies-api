@@ -13,8 +13,7 @@ async function obtenerPolizasVigentes() {
 
     try {
 
-        const token =
-            await obtenerTokenMA();
+        const token = await obtenerTokenMA();
 
         const productor = 13529;
 
@@ -35,24 +34,13 @@ async function obtenerPolizasVigentes() {
                 }
             );
 
-        console.log(
-            JSON.stringify(
-                response.data,
-                null,
-                2
-            )
-        );
+        console.log(JSON.stringify(response.data,null,2));
 
     } catch (error: any) {
 
-        console.error(
-            "STATUS:",
-            error?.response?.status
-        );
+        console.error("STATUS:",error?.response?.status);
 
-        console.error(
-            error?.response?.data
-        );
+        console.error(error?.response?.data);
     }
 }
 

@@ -14,8 +14,7 @@ async function obtenerPropuestas() {
 
         const token = await obtenerTokenRUS();
         console.log("TOKEN OBTENIDO");
-        const response = await axios.post(
-            `${RUS_V2_BASE_URL}/v2/propuestas/propuestas`,
+        const response = await axios.post(`${RUS_V2_BASE_URL}/v2/propuestas/propuestas`,
             {
                 codigoProductor: [7716],
                 fechaEmision: "2025-12-12",
@@ -31,9 +30,6 @@ async function obtenerPropuestas() {
             }
         );
 
-        console.log("STATUS:", response.status);
-        console.log(response.data);
-
     } catch (error: any) {
 
         console.error("ERROR COMPLETO:");
@@ -45,10 +41,7 @@ async function obtenerPropuestas() {
         console.error("STACK:");
         console.error(error?.stack);
     
-        console.error(
-            "ERROR STATUS:",
-            error?.response?.status
-        );
+        console.error( "ERROR STATUS:",error?.response?.status);
     }
 }
 

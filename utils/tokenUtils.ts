@@ -1,39 +1,132 @@
+//utils/tokenUtils.ts
 import fs from "fs";
+import path from "path";
 
-const TOKEN_FILE = "./token.json";
-
-export function guardarToken(token: string) {
-
-    fs.writeFileSync(
-        TOKEN_FILE,
-        JSON.stringify({
-            token
-        }, null, 2)
-    );
+export interface TokenData {
+    access_token: string;
+    refresh_token?: string;
 }
 
-export function leerToken(): string | null {
+const TOKENS_DIR = path.resolve(
+    __dirname,
+    "../tokens"
+);
 
-    if (!fs.existsSync(TOKEN_FILE)) {
+function asegurarDirectorioTokens(): void {
+
+    if (!fs.existsSync(TOKENS_DIR)) {
+
+        fs.mkdirSync(
+            TOKENS_DIR,
+            { recursive: true }
+        );
+
+    }
+
+}
+
+export function guardarToken(
+    compania: string,
+    data: TokenData
+): void {
+
+    asegurarDirectorioTokens();
+
+    const archivo = path.join(
+        TOKENS_DIR,
+        `${compania}.json`
+    );
+
+    fs.writeFileSync(
+        archivo,
+        JSON.stringify(
+            data,
+            null,
+            2
+        ),
+        "utf8"
+    );
+
+}
+
+export function leerToken(
+    compania: string
+): TokenData | null {
+
+    asegurarDirectorioTokens();
+
+    const archivo = path.join(
+        TOKENS_DIR,
+        `${compania}.json`
+    );
+
+    if (!fs.existsSync(archivo)) {
         return null;
     }
 
-    const data = JSON.parse(
-        fs.readFileSync(TOKEN_FILE, "utf8")
-    );
+    try {
 
-    return data.token;
+        const contenido =
+            fs.readFileSync(
+                archivo,
+                "utf8"
+            );
+
+        return JSON.parse(
+            contenido
+        ) as TokenData;
+
+    } catch (error) {
+
+        console.error(
+            `Error leyendo token de ${compania}:`,
+            error
+        );
+
+        return null;
+
+    }
+
 }
 
-export function tokenExpirado(token: string): boolean {
+export function borrarToken(
+    compania: string
+): void {
+
+    const archivo = path.join(
+        TOKENS_DIR,
+        `${compania}.json`
+    );
+
+    if (
+        fs.existsSync(archivo)
+    ) {
+
+        fs.unlinkSync(
+            archivo
+        );
+
+    }
+
+}
+
+export function tokenExpirado(
+    token: string
+): boolean {
 
     try {
 
-        const payloadBase64 = token.split(".")[1];
+        const partes =
+            token.split(".");
 
-        if (!payloadBase64) {
+        if (
+            partes.length < 2
+        ) {
             return true;
         }
+
+        const payloadBase64 =
+            partes[1]!;
 
         const payload = JSON.parse(
             Buffer.from(
@@ -42,14 +135,23 @@ export function tokenExpirado(token: string): boolean {
             ).toString()
         );
 
-        const ahora = Math.floor(
-            Date.now() / 1000
-        );
+        if (
+            !payload.exp
+        ) {
+            return true;
+        }
+
+        const ahora =
+            Math.floor(
+                Date.now() / 1000
+            );
 
         return payload.exp <= ahora;
 
     } catch {
 
         return true;
+
     }
+
 }

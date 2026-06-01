@@ -1,3 +1,4 @@
+//rus/login.ts
 import axios from "axios";
 import dotenv from "dotenv";
 
@@ -5,30 +6,37 @@ import {
     guardarToken,
     leerToken,
     tokenExpirado
-} from "./utils/tokenUtils"
+} from "../utils/tokenUtils";
 
 dotenv.config();
+import path from "path";
+
+dotenv.config({
+    path: path.resolve(__dirname, "../.env")
+});
+
+console.log("ENV:", process.env.RUS_V2_BASE_URL);
 
 const RUS_V2_BASE_URL = process.env.RUS_V2_BASE_URL!;
 const RUS_V2_API_KEY = process.env.RUS_V2_API_KEY!;
 const RUS_V2_USERNAME = process.env.RUS_V2_USERNAME!;
 const RUS_V2_PASSWORD = process.env.RUS_V2_PASSWORD!;
 
-export async function obtenerToken(): Promise<string> {
+export async function obtenerTokenRUS(): Promise<string> {
 
-    const tokenGuardado = leerToken();
+    const tokenGuardado = leerToken("rus");
 
     if (
-        tokenGuardado &&
-        !tokenExpirado(tokenGuardado)
+        tokenGuardado?.access_token &&
+        !tokenExpirado(tokenGuardado.access_token)
     ) {
 
-        console.log("TOKEN CACHE");
+        console.log("TOKEN RUS CACHE");
 
-        return tokenGuardado;
+        return tokenGuardado.access_token;
     }
 
-    console.log("SOLICITANDO NUEVO TOKEN");
+    console.log("SOLICITANDO TOKEN RUS");
 
     const response = await axios.post(
         `${RUS_V2_BASE_URL}/v2/login/token`,
@@ -44,9 +52,13 @@ export async function obtenerToken(): Promise<string> {
         }
     );
 
-    const token = response.data.access_token;
+    guardarToken(
+        "rus",
+        {
+            access_token: response.data.access_token,
+            refresh_token: response.data.refresh_token
+        }
+    );
 
-    guardarToken(token);
-
-    return token;
+    return response.data.access_token;
 }

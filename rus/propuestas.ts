@@ -1,7 +1,7 @@
-
+//rus/propuestas.ts
 import axios from "axios";
 import dotenv from "dotenv";
-import { obtenerToken } from "./login";
+import { obtenerTokenRUS } from "./login";
 
 dotenv.config();
 
@@ -12,13 +12,13 @@ async function obtenerPropuestas() {
 
     try {
 
-        const token = await obtenerToken();
-
+        const token = await obtenerTokenRUS();
+        console.log("TOKEN OBTENIDO");
         const response = await axios.post(
             `${RUS_V2_BASE_URL}/v2/propuestas/propuestas`,
             {
-                codigoProductor: [8381],
-                fechaEmision: "2025-11-13",
+                codigoProductor: [7716],
+                fechaEmision: "2025-12-12",
                 pagina: 0
             },
             {
@@ -31,31 +31,23 @@ async function obtenerPropuestas() {
             }
         );
 
-        console.log("\nSTATUS:", response.status);
-
-        console.log(
-            JSON.stringify(response.data, null, 2)
-        );
+        console.log("STATUS:", response.status);
+        console.log(response.data);
 
     } catch (error: any) {
 
+        console.error("ERROR COMPLETO:");
+        console.error(error);
+    
+        console.error("MESSAGE:");
+        console.error(error?.message);
+    
+        console.error("STACK:");
+        console.error(error?.stack);
+    
         console.error(
             "ERROR STATUS:",
             error?.response?.status
-        );
-
-        console.error(
-            "ERROR HEADERS:",
-            error?.response?.headers
-        );
-
-        console.error(
-            "ERROR DATA:",
-            JSON.stringify(
-                error?.response?.data,
-                null,
-                2
-            )
         );
     }
 }

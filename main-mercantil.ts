@@ -1,4 +1,4 @@
-import { MercantilPolizasManager } from "./mercantil/services/mercantilPolizasManager";
+import { MercantilPolizasManager } from "./mercantil/models/mercantilPolizasManager";
 import { obtenerPolizasVigentes }
 from "./mercantil/services/mercantilPolizasService";
 

@@ -3,7 +3,7 @@
 import {
     MercantilPoliza,
     MercantilPolizasResponse
-} from "../models/mercantilModelPolizas";
+} from "./mercantilModelPolizas";
 
 export class MercantilPolizasManager {
 

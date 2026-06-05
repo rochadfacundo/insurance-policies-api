@@ -18,13 +18,7 @@ export async function obtenerTokenRUS(): Promise<string> {
 
     const loginUrl = `${config.baseUrl}/login/token`;
 
-    console.log("LOGIN URL:",loginUrl);
-
-    if (tokenGuardado?.access_token && !tokenExpirado(tokenGuardado.access_token)) 
-        {
-        console.log(`TOKEN RUS CACHE (${config.env})`
-        );
-
+    if (tokenGuardado?.access_token && !tokenExpirado(tokenGuardado.access_token)) {
         return tokenGuardado.access_token;
     }
 
@@ -32,10 +26,8 @@ export async function obtenerTokenRUS(): Promise<string> {
 
     const response = await axios.post(loginUrl,
             {
-                username:
-                    config.username,
-                password:
-                    config.password
+                username: config.username,
+                password: config.password
             },
             {
                 headers: {

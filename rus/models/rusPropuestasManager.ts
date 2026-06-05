@@ -17,10 +17,8 @@
  * La obtención de datos corresponde al RusPropuestasService.
  */
 
-import {
-    RusPropuesta,
-    RusPropuestasResponse
-} from "./rusInterfaces";
+import { parseFecha } from "../../utils/utils";
+import { RusPropuesta, RusPropuestasResponse} from "./rusPropuestasInterfaces";
 
 export class RusPropuestasManager {
 
@@ -28,11 +26,36 @@ export class RusPropuestasManager {
     private readonly total: number;
     private readonly propuestas: RusPropuesta[];
 
-    constructor(private readonly response: RusPropuestasResponse) 
-    {
-        this.propuestas = response.results;
-        this.total = response.paging.total;
-        this.productor = response.results[0]?.productor ?? 0;
+    constructor(private readonly response: RusPropuestasResponse) {
+    
+        this.validarResponse(this.response);
+    
+        this.propuestas = this.response.results;
+        this.total = this.response.paging.total;
+        this.productor = this.response.results[0]?.productor ?? 0;
+    }
+
+    /*
+        * Valida la estructura de la respuesta.
+        * Lanza errores descriptivos si encuentra problemas.
+    */
+    private validarResponse(response: RusPropuestasResponse): void {
+    
+        if (!response) {
+          throw new Error("RusPropuestasResponse es requerido.");
+        }
+    
+        if (!Array.isArray(response.results)) {
+            throw new Error("response.results debe ser un array.");
+        }
+    
+        if (!response.paging || typeof response.paging.total !== "number") {
+            throw new Error("paging.total inválido.");
+        }
+    
+        if (response.paging.total < 0) {
+            throw new Error("paging.total no puede ser negativo.");
+        }
     }
 
     /**
@@ -41,8 +64,70 @@ export class RusPropuestasManager {
      * Internamente utiliza la fecha de fin de vigencia.
      */
     getProximasARenovar(dias: number): RusPropuesta[] {
-
+    
+        if (!Number.isFinite(dias) || dias < 0) {
+            throw new Error("Los días deben ser un número válido mayor o igual a 0.");
+        }
+    
         return this.getQueVencenEn(dias);
+    }
+
+    /**
+     * Obtiene únicamente propuestas de flotas.
+     */
+    getFlotas(): RusPropuesta[] {
+
+        return this.propuestas.filter(p => p.esFlota);
+    }
+
+    /**
+     * Obtiene propuestas con premio positivo.
+     */
+    getConPremioPositivo(): RusPropuesta[] {
+
+        return this.propuestas.filter(p => p.premio > 0);
+    }
+
+    /**
+     * Obtiene propuestas cuya prima supera el monto indicado.
+     */
+    getConPremioMayorA(premioMinimo: number): RusPropuesta[] {
+    
+        if (premioMinimo < 0) {
+            throw new Error("El premio mínimo no puede ser negativo.");
+        }
+    
+        return this.propuestas.filter(p => p.premio >= premioMinimo);
+    }
+
+    /**
+     * Obtiene riesgos relevantes para gestión comercial.
+     *
+     * - Flotas
+     * - Primas superiores al importe indicado
+     */
+    getRiesgosRelevantes(premioMinimo: number = 5000000): RusPropuesta[] {
+
+        return this.propuestas.filter(
+            p =>
+                p.esFlota ||
+                p.premio >= premioMinimo
+        );
+    }
+
+    /**
+     * Resumen comercial de la cartera.
+     */
+    getResumenComercial() {
+
+        return {
+
+            flotas: this.getFlotas().length,
+
+            riesgosMayores: this.getConPremioMayorA(5000000).length,
+
+            riesgosRelevantes: this.getRiesgosRelevantes().length
+        };
     }
 
     /**
@@ -50,6 +135,10 @@ export class RusPropuestasManager {
     * de las pólizas próximas a renovar.
     */
     getResumenRenovaciones(dias: number) {
+
+        if (!Number.isFinite(dias) || dias < 0) {
+            throw new Error("Los días deben ser un número válido mayor o igual a 0.");
+        }
 
         return this.getProximasARenovar(dias).map( propuesta => ({
 
@@ -70,6 +159,10 @@ export class RusPropuestasManager {
      * * Calcula la diferencia entre la fecha de fin de vigencia y la fecha actual.
     */
     getDiasParaVencimiento(numeroPoliza:number): number | null {
+
+        if (numeroPoliza <= 0) {
+            throw new Error("Número de póliza inválido.");
+        }
     
         const propuesta = this.getPropuesta(numeroPoliza);
     
@@ -79,16 +172,11 @@ export class RusPropuestasManager {
     
         const hoy = new Date();
     
-        const vencimiento = new Date(propuesta.finVigencia);
+        const vencimiento = parseFecha(propuesta.finVigencia);
     
-        const diferencia =
-            vencimiento.getTime()
-            - hoy.getTime();
+        const diferencia = vencimiento.getTime() - hoy.getTime();
 
-        return Math.ceil(
-            diferencia /
-            (1000 * 60 * 60 * 24)
-        );
+        return Math.ceil(diferencia / (1000 * 60 * 60 * 24));
     }
 
     /**
@@ -131,10 +219,12 @@ export class RusPropuestasManager {
      * Busca una propuesta por número de póliza.
      */
     getPropuesta(numeroPoliza: number): RusPropuesta | undefined {
+        if (!Number.isFinite(numeroPoliza) || numeroPoliza <= 0 ) 
+        {
+            throw new Error("Número de póliza inválido.");
+        }
 
-        return this.propuestas.find(
-            p => p.numeroPoliza === numeroPoliza
-        );
+        return this.propuestas.find(p => p.numeroPoliza === numeroPoliza);
     }
 
     /**
@@ -142,9 +232,11 @@ export class RusPropuestasManager {
      */
     getPropuestasPorDocumento(documento: number): RusPropuesta[] {
 
-        return this.propuestas.filter(
-            p => p.docPersona === documento
-        );
+        if (documento <= 0) {
+            throw new Error("Documento inválido.");
+        }
+
+        return this.propuestas.filter(p => p.docPersona === documento);
     }
 
     /**
@@ -152,8 +244,11 @@ export class RusPropuestasManager {
      */
     getPropuestasPorNombre(nombre: string): RusPropuesta[] {
 
-        const filtro =
-            nombre.trim().toUpperCase();
+        if (!nombre?.trim()) {
+            throw new Error("Debe indicar un nombre.");
+        }
+
+        const filtro = nombre.trim().toUpperCase();
 
         return this.propuestas.filter(
             p =>
@@ -169,8 +264,11 @@ export class RusPropuestasManager {
      */
     getPropuestasPorCobertura(cobertura: string): RusPropuesta[] {
 
-        const filtro =
-            cobertura.trim().toUpperCase();
+        if (!cobertura?.trim()) {
+            throw new Error("Debe indicar una cobertura.");
+        }
+
+        const filtro = cobertura.trim().toUpperCase();
 
         return this.propuestas.filter(
             p =>
@@ -181,14 +279,19 @@ export class RusPropuestasManager {
         );
     }
 
+
+
+
     /**
      * Busca propuestas por sección.
      */
     getPropuestasPorSeccion(numeroSeccion: number): RusPropuesta[] {
 
-        return this.propuestas.filter(
-            p => p.numeroSeccion === numeroSeccion
-        );
+        if (numeroSeccion <= 0) {
+            throw new Error("Número de sección inválido.");
+        }
+
+        return this.propuestas.filter(p => p.numeroSeccion === numeroSeccion);
     }
 
     /**
@@ -211,15 +314,17 @@ export class RusPropuestasManager {
 
         const hoy = new Date();
 
-        return this.propuestas.filter(
-            p => new Date(p.finVigencia) < hoy
-        );
+        return this.propuestas.filter( p => parseFecha(p.finVigencia) < hoy);
     }
 
     /**
      * Obtiene propuestas que vencen dentro de X días.
      */
     getQueVencenEn(dias: number): RusPropuesta[] {
+
+        if (!Number.isFinite(dias) || dias < 0) {
+            throw new Error("Los días deben ser un número válido mayor o igual a 0.");
+        }
 
         const hoy = new Date();
 
@@ -229,14 +334,10 @@ export class RusPropuestasManager {
 
         return this.propuestas.filter(
             p => {
-
-                const vencimiento =
-                    new Date(p.finVigencia);
-
-                return (
-                    vencimiento >= hoy &&
-                    vencimiento <= limite
-                );
+        
+                const vencimiento = parseFecha(p.finVigencia);
+        
+                return (vencimiento >= hoy && vencimiento <= limite);
             }
         );
     }
@@ -326,9 +427,9 @@ export class RusPropuestasManager {
         return [...this.propuestas]
             .sort(
                 (a, b) =>
-                    new Date(a.finVigencia).getTime()
+                    parseFecha(a.finVigencia).getTime()
                     -
-                    new Date(b.finVigencia).getTime()
+                    parseFecha(b.finVigencia).getTime()
             );
     }
 
@@ -371,7 +472,8 @@ export class RusPropuestasManager {
             renovaciones: this.getRenovaciones().length,
             nuevas: this.getNuevas().length,
             premioTotal: this.getPremioTotal(),
-            cuotaTotal: this.getCuotaTotal()
+            cuotaTotal: this.getCuotaTotal(),
+            riesgosRelevantes: this.getRiesgosRelevantes().length,
         };
     }
 }

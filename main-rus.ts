@@ -1,53 +1,114 @@
-import { RusPropuestasRequest } from "./rus/models/rusInterfaces";
-import { RusPropuestasManager } from "./rus/models/rusPropuestasManager";
-import { obtenerPropuestas } from "./rus/services/rusPropuestasService";
+import { RusCarteraService } from "./rus/services/rusCarteraService";
+
 
 async function main() {
 
     try {
 
-        const request: RusPropuestasRequest = {
-            codigoProductor: [8381],
-            fechaEmision: "2025-11-13",
-            pagina: 0
-        };
+        // organizador: 8381
+        //const ORGANIZADOR = 8381;
 
-        const response = await obtenerPropuestas(request);
-
-        const manager = new RusPropuestasManager(response);
-
-        console.log("=== RESUMEN ===");
-        console.log(manager.getResumen());
-
-        console.log("=== PRODUCTOR ===");
-        console.log(manager.getProductor());
+        // productor: 7716
+        const PRODUCTOR = 7716;
 
 
-        console.log("=== VIGENTES ===");
-        console.log(manager.getVigentes().length);
+        console.log("=================================");
+        console.log("ANÁLISIS DE CARTERA RUS");
+        console.log("=================================");
+        console.log(`Productor: ${PRODUCTOR}`);
+        console.log("Consultando último año...");
+        console.log("");
 
-        console.log("=== VENCIDAS ===");
-        console.log(manager.getVencidas().length);
+        const carteraService =  new RusCarteraService();
 
-        console.log("=== RENOVACIONES ===");
-        console.log(manager.getRenovaciones().length);
+        const manager = await carteraService.obtenerUltimos30Dias(PRODUCTOR);
 
-        console.log("=== NUEVAS ===");
-        console.log(manager.getNuevas().length);
+        
 
-        console.log("=== PROXIMAS A RENOVAR (30 DIAS) ===");
-        console.log(manager.getProximasARenovar(30));
+        console.log("=================================");
+        console.log("RESUMEN");
+        console.log("=================================");
 
-        console.log("=== RESUMEN RENOVACIONES ===");
-        console.log(manager.getResumenRenovaciones(30));
+        console.log("Nombre productor:",manager.getProductor());
 
+        console.log("Cantidad de propuestas:",manager.getCantidad());
 
+        console.log("Premio total cartera:",manager.getPremioTotal().toLocaleString("es-AR"));
 
-    } catch (error: any) {
+        console.log("");
 
-        console.error("STATUS:", error?.response?.status);
-        console.error("DATA:", error?.response?.data);
-        console.error("MESSAGE:", error?.message);
+        const flotas =  manager.getFlotas();
+
+        const riesgosMayores =  manager.getConPremioMayorA(5000000);
+
+        console.log(`Flotas detectadas: ${flotas.length}`);
+
+        console.log(`Pólizas con premio superior a $5.000.000: ${riesgosMayores.length}`);
+
+        console.log("");
+
+        console.log("=================================");
+        console.log("FLOTAS");
+        console.log("=================================");
+
+        if (flotas.length === 0) {
+
+            console.log("No se encontraron flotas.");
+
+        } else {
+
+            for (const propuesta of flotas) {
+
+                console.log({
+                    poliza: propuesta.numeroPoliza,
+
+                    asegurado: propuesta.nombrePersona,
+
+                    cobertura: propuesta.cobertura,
+
+                    premio: propuesta.premio.toLocaleString("es-AR")
+                });
+            }
+        }
+
+        console.log("");
+        console.log("=================================");
+        console.log("PREMIOS MAYORES A $5.000.000");
+        console.log("=================================");
+
+        if (riesgosMayores.length === 0) {
+
+            console.log("No se encontraron riesgos de alto valor.");
+
+        } else {
+
+            for (const propuesta of riesgosMayores) {
+
+                console.log({
+                    poliza: propuesta.numeroPoliza,
+
+                    asegurado: propuesta.nombrePersona,
+
+                    cobertura: propuesta.cobertura,
+
+                    premio: propuesta.premio.toLocaleString("es-AR"),
+
+                    esFlota: propuesta.esFlota  });
+            }
+        }
+
+        console.log("");
+        console.log("=================================");
+        console.log("FIN DEL ANÁLISIS");
+        console.log("=================================");
+
+    } catch (error) {
+
+        console.error(
+            "ERROR ANALIZANDO CARTERA:"
+        );
+
+        console.error(error);
     }
 }
 

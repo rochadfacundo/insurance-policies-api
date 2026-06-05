@@ -5,7 +5,7 @@ import { getRusConfig } from "../config";
 import {
     RusPropuestasRequest,
     RusPropuestasResponse
-} from "../models/rusInterfaces";
+} from "../models/rusPropuestasInterfaces";
 
 export async function obtenerPropuestas(body: RusPropuestasRequest): Promise<RusPropuestasResponse> {
 

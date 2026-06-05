@@ -1,20 +1,47 @@
-import { MercantilPolizasManager } from "./mercantil/models/mercantilPolizasManager";
-import { obtenerPolizasVigentes }
-from "./mercantil/services/mercantilPolizasService";
+import { MercantilCarteraService }
+from "./mercantil/services/mercantilCarteraService";
 
+import { obtenerDetallePoliza }
+from "./mercantil/services/mercantilDetallePolizaService";
 
 async function main() {
 
     try {
 
-        const respuesta =  await obtenerPolizasVigentes(97715, 100, 0);
+        const PRODUCTOR = 97715;
 
-        const manager = new MercantilPolizasManager(respuesta);
+        const carteraService =
+            new MercantilCarteraService();
 
-        console.log("\n=== NOMBRE DEL PRODUCTOR ===");
-        console.log(manager.getNombreProductor());
-        console.log("\n=== RESUMEN ===");
-        console.log(manager.toString());
+        const manager =
+            await carteraService
+                .obtenerCarteraCompleta(
+                    PRODUCTOR
+                );
+
+        const poliza =
+            manager.getPolizas()[0];
+
+        console.log(
+            "POLIZA SELECCIONADA:"
+        );
+
+        console.log(poliza);
+
+        if(poliza === undefined) {
+
+            throw new Error("No se encontraron pólizas para el productor especificado.");
+        }
+
+        const detalle = await obtenerDetallePoliza(poliza.poliza,poliza.endoso);    
+
+        console.log(
+            JSON.stringify(
+                detalle,
+                null,
+                2
+            )
+        );
 
     } catch (error: any) {
 

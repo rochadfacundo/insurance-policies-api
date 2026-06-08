@@ -1,57 +1,80 @@
 import { MercantilCarteraService }
 from "./mercantil/services/mercantilCarteraService";
 
-import { obtenerDetallePoliza }
-from "./mercantil/services/mercantilDetallePolizaService";
-
 async function main() {
 
     try {
 
-        const PRODUCTOR = 97715;
+        const PRODUCTORES = [
 
-        const carteraService =
-            new MercantilCarteraService();
+            /*
+            NO ASOCIADO AUN
+            {
+                codigo: 95848,
+                nombre: "Técnica y Servicios"
+            },*/
 
-        const manager =
-            await carteraService
-                .obtenerCarteraCompleta(
-                    PRODUCTOR
-                );
+            {
+                codigo: 83973,
+                nombre: "De Maio Mónica"
+            },
 
-        const poliza =
-            manager.getPolizas()[0];
+            {
+                codigo: 96826,
+                nombre: "Oggero Cristian"
+            }
+        ];
 
-        console.log(
-            "POLIZA SELECCIONADA:"
-        );
+        const carteraService =  new MercantilCarteraService();
 
-        console.log(poliza);
+        for (const productor of PRODUCTORES) {
 
-        if(poliza === undefined) {
+            console.log("");
+            console.log("=================================");
+            console.log(
+                `${productor.nombre} (${productor.codigo})`
+            );
+            console.log("=================================");
 
-            throw new Error("No se encontraron pólizas para el productor especificado.");
-        }
+            const cartera = await carteraService.obtenerCarteraCompleta(productor.codigo);
 
-        const detalle = await obtenerDetallePoliza(poliza.poliza,poliza.endoso);    
+            console.log(`Pólizas encontradas: ${cartera.getCantidad()}`);
 
-        console.log(
-            JSON.stringify(
-                detalle,
-                null,
-                2
-            )
-        );
+                try {
 
-    } catch (error: any) {
+                    const manager = await carteraService.obtenerCarteraCompleta(productor.codigo);
 
-        console.error(
-            error?.response?.status
-        );
+                    
+                     const flotas =  manager.getFlotas();
+                    
+                    console.log(
+                        `Flotas encontradas: ${flotas.length}`
+                    );
+                    
+                    for (const flota of flotas) {
+                    
+                        console.log({
+                            poliza: flota.poliza,
+                            asegurado: flota.nombreAsegurado,
+                            bienAsegurado: flota.bienAsegurado
+                        });
+                    }
+                
 
-        console.error(
-            error?.response?.data
-        );
+                } catch (error: any) {
+
+        
+                }
+            }
+
+
+        
+
+    } catch (error) {
+
+        console.error("ERROR ANALIZANDO CARTERA:");
+
+        console.error(error);
     }
 }
 

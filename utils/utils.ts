@@ -12,3 +12,18 @@
     
         return date;
     }
+
+
+    /**
+     * Convierte Date a formato YYYY-MM-DD.
+     */
+    export function formatearFecha(fecha: Date): string {
+    
+        const fechaFormateada = fecha.toISOString().split("T")[0];
+    
+        if (!fechaFormateada) {
+            throw new Error("No se pudo formatear la fecha");
+        }
+    
+        return fechaFormateada;
+    }

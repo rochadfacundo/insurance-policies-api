@@ -1,6 +1,7 @@
+import { formatearFecha } from "../../utils/utils";
 import { RusPropuesta, RusPropuestasRequest, RusPropuestasResponse } from "../models/rusPropuestasInterfaces";
 import { RusPropuestasManager } from "../models/rusPropuestasManager";
-import { obtenerPropuestas } from "./rusPropuestasService";
+import { obtenerDetallePropuesta, obtenerPropuestas } from "./rusPropuestasService";
 
 
 /**
@@ -24,6 +25,34 @@ export class RusCarteraService {
         this.defaultPagina = defaultPagina;
     }
 
+
+    /**
+     * Crea un RusPropuestasManager a partir de una lista acumulada.
+     * Asume que las propuestas ya fueron filtradas por fecha y productor.
+     * No realiza llamadas adicionales, solo formatea la respuesta para el manager.
+     */
+    private crearManagerDesdePropuestas(propuestas: RusPropuesta[]): RusPropuestasManager {
+
+        const response: RusPropuestasResponse = {
+            paging: {
+                total: propuestas.length,
+                limit: propuestas.length,
+                offset: 0
+            },
+            results: propuestas
+        };
+
+        return new RusPropuestasManager(response);
+    }
+
+    /**
+     * Obtiene el detalle completo de una propuesta.
+     */
+    async obtenerDetalleDePropuesta(prop: RusPropuesta): Promise<any> {
+        return await obtenerDetallePropuesta(prop.numeroSeccion, prop.propuesta, prop.endoso,prop.renovacion);
+    }
+
+
     /**
      * Obtiene cartera de un año específico.
      */
@@ -38,13 +67,14 @@ export class RusCarteraService {
     async obtenerUltimosDias(productor: number, dias: number): Promise<RusPropuestasManager> {
 
         const hasta = new Date();
-
         const desde = new Date();
 
         desde.setDate(desde.getDate() - dias);
 
-        return await this.obtenerCarteraPorRango(productor,this.formatearFecha(desde),this.formatearFecha(hasta));
+        return await this.obtenerCarteraPorRango(productor,formatearFecha(desde),formatearFecha(hasta));
     }
+
+
 
     /**
      * Obtiene cartera de los últimos 30 días.
@@ -68,10 +98,9 @@ export class RusCarteraService {
     async obtenerPorMes(productor: number,anio: number,mes: number): Promise<RusPropuestasManager> {
 
         const desde = new Date(anio, mes - 1, 1);
-
         const hasta = new Date(anio, mes, 0);
 
-        return await this.obtenerCarteraPorRango(productor,this.formatearFecha(desde),this.formatearFecha(hasta));
+        return await this.obtenerCarteraPorRango(productor,formatearFecha(desde),formatearFecha(hasta));
     }
 
     /**
@@ -139,14 +168,13 @@ export class RusCarteraService {
 
         desde.setMonth(desde.getMonth() - meses);
 
-        return await this.obtenerCarteraPorRango(productor,this.formatearFecha(desde),this.formatearFecha(hasta));
+        return await this.obtenerCarteraPorRango(productor,formatearFecha(desde),formatearFecha(hasta));
     }
 
     /**
      * Obtiene cartera de los últimos 6 meses.
      */
     async obtenerUltimos6Meses(productor: number): Promise<RusPropuestasManager> {
-
         return await this.obtenerUltimosMeses(productor, 6);
     }
 
@@ -154,7 +182,6 @@ export class RusCarteraService {
      * Obtiene cartera del último año.
      */
     async obtenerUltimoAnio(productor: number): Promise<RusPropuestasManager> {
-
         return await this.obtenerUltimosMeses(productor, 12);
     }
 
@@ -169,7 +196,7 @@ export class RusCarteraService {
         const hasta = new Date(`${fechaHasta}T00:00:00`);
 
         while (actual <= hasta) {
-            fechas.push(this.formatearFecha(actual));
+            fechas.push(formatearFecha(actual));
             actual.setDate(actual.getDate() + 1);
         }
 
@@ -197,34 +224,5 @@ export class RusCarteraService {
         return Array.from(map.values());
     }
 
-    /**
-     * Crea un RusPropuestasManager a partir de una lista acumulada.
-     */
-    private crearManagerDesdePropuestas(propuestas: RusPropuesta[]): RusPropuestasManager {
 
-        const response: RusPropuestasResponse = {
-            paging: {
-                total: propuestas.length,
-                limit: propuestas.length,
-                offset: 0
-            },
-            results: propuestas
-        };
-
-        return new RusPropuestasManager(response);
-    }
-
-    /**
-     * Convierte Date a formato YYYY-MM-DD.
-     */
-    private formatearFecha(fecha: Date): string {
-    
-        const fechaFormateada = fecha.toISOString().split("T")[0];
-    
-        if (!fechaFormateada) {
-            throw new Error("No se pudo formatear la fecha");
-        }
-    
-        return fechaFormateada;
-    }
 }

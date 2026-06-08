@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 import path from "path";
 
 import { obtenerTokenMA } from "../login";
+import { MercantilDetallePoliza } from "../models/mercantilDetallePoliza";
 
 dotenv.config({
     path: path.resolve(
@@ -19,21 +20,20 @@ const SUBSCRIPTION_KEY =
 
 /**
  * Obtiene el detalle completo de una póliza.
- *
- * Por ahora retorna any hasta conocer
- * exactamente la estructura del endpoint.
+ * Incluye información de la póliza, endosos, bienes, coberturas, etc.
+ * Si total o cantidad es mayor a 1, se considera flota.
+ * No contiene lógica de negocio, solo delega la consulta a mercantilDetallePolizaService.
+ * La lógica de negocio sobre el detalle de la póliza vive en MercantilDetallePolizaManager.
+ * @param poliza Número de póliza.
+ * @param endoso Número de endoso.
+ * @return Un MercantilDetallePoliza con el detalle completo de la póliza.
+ * @throws Error si la consulta falla.
  */
-export async function obtenerDetallePoliza(
-    poliza: number,
-    endoso: number
-): Promise<any> {
+export async function obtenerDetallePoliza(poliza: number, endoso: number): Promise<MercantilDetallePoliza> {
 
-    const token =
-        await obtenerTokenMA();
+    const token = await obtenerTokenMA();
 
-    const response =
-        await axios.get(
-            `${BASE_URL}/polizas/v1/${poliza}/${endoso}`,
+    const response = await axios.get(`${BASE_URL}/polizas/v1/${poliza}/${endoso}`,
             {
                 headers: {
                     Authorization:

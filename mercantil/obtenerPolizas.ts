@@ -7,11 +7,9 @@ import { MercantilPolizasResponse } from "./models/mercantilModelPolizas";
 
 dotenv.config();
 
-const BASE_URL =
-    process.env.MA_BASE_URL!;
+const BASE_URL = process.env.MA_BASE_URL!;
 
-const SUBSCRIPTION_KEY =
-    process.env.MA_SUBSCRIPTION_KEY!;
+const SUBSCRIPTION_KEY = process.env.MA_SUBSCRIPTION_KEY!;
 
 export async function obtenerPolizasVigentes(productor: number,limit: number = 20,offset: number = 0)
 : Promise<MercantilPolizasResponse> {

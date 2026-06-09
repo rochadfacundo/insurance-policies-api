@@ -1,8 +1,10 @@
+import { MercantilDetallePolizaManager } from "../models/mercantilDetallePolizaManager";
 import {    MercantilPoliza,    MercantilPolizasResponse} from "../models/mercantilModelPolizas";
 
 import { MercantilPolizasManager }from "../models/mercantilPolizasManager";
 import { MercantilBienesPolizaManager } from "./mercantilBienesPolizaManager";
 import { obtenerBienesPoliza } from "./mercantilBienesService";
+import { obtenerDetallePoliza } from "./mercantilDetallePolizaService";
 
 import { obtenerPolizasVigentes } from "./mercantilPolizasService";
 
@@ -48,6 +50,15 @@ export class MercantilCarteraService {
     
         return new MercantilBienesPolizaManager(bienes);
     }
+
+    async obtenerDetallePoliza(poliza: number, endoso: number): Promise<MercantilDetallePolizaManager> {
+    
+        const detalle = await obtenerDetallePoliza(poliza,endoso);
+    
+        return new MercantilDetallePolizaManager(detalle);
+    }
+
+
 
 
     /**

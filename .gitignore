@@ -19,6 +19,22 @@ tokens/
 tokens/*
 
 # =========================
+# Carpeta puntual de archivos 
+# =========================
+mercantil/models/data/
+mercantil/models/data/*
+mercantil/models/data/*.json
+
+rus/models/data/
+rus/models/data/*
+rus/models/data/*.json
+
+fedpat/models/data/
+fedpat/models/data/*
+fedpat/models/data/*.json
+
+
+# =========================
 # Build
 # =========================
 dist/
@@ -49,3 +65,13 @@ Thumbs.db
 # TypeScript
 # =========================
 *.tsbuildinfo
+
+# =========================
+# test JSONs
+# =========================
+*.json
+
+# =========================
+# test excels
+# =========================
+*.xlsx

@@ -24,16 +24,6 @@ export class MercantilBienesPolizaManager {
         return this.bienes.total;
     }
 
-    /*
-        * Determina si la póliza es flota o no.
-         * Si total o cantidad es mayor a 1, se considera flota.
-         * No contiene lógica de negocio, solo delega la consulta a mercantilBienesService.
-         * La lógica de negocio sobre los bienes vive en MercantilBienesPolizaManager.
-         * @return true si la póliza es flota, false si no lo es.
-    */
-    esFlota(): boolean {
-        return this.getCantidadBienes() > 1;
-    }
 
     /*
         * Obtiene el valor total asegurado de la póliza.

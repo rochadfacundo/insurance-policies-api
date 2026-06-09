@@ -21,12 +21,12 @@ export async function obtenerTokenMA(): Promise<string> {
 
     if (tokenGuardado?.access_token &&!tokenExpirado(tokenGuardado.access_token))
     {
-        console.log("TOKEN MERCANTIL CACHE");
+       // console.log("TOKEN MERCANTIL CACHE");
 
         return tokenGuardado.access_token;
     }
 
-    console.log("SOLICITANDO TOKEN MERCANTIL");
+    //console.log("SOLICITANDO TOKEN MERCANTIL");
 
 
     const body = new URLSearchParams();

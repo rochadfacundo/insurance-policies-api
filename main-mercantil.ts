@@ -1,74 +1,138 @@
-import { MercantilCarteraService }
-from "./mercantil/services/mercantilCarteraService";
+import { obtenerProductoresMercantil } from "./mercantil/models/productoresMercantil";
+import { RiesgoMercantil } from "./mercantil/models/riesgoMercantil";
+import { MercantilCarteraService } from "./mercantil/services/mercantilCarteraService";
+import { guardarJson } from "./utils/jsonUtils";
+
+import { calcularDiasRestantes } from "./utils/utils";
+
 
 async function main() {
 
     try {
 
-        const PRODUCTORES = [
 
-            /*
-            NO ASOCIADO AUN
-            {
-                codigo: 95848,
-                nombre: "Técnica y Servicios"
-            },*/
+    const productores = obtenerProductoresMercantil().filter(p => p.estado_id === 1);
 
-            {
-                codigo: 83973,
-                nombre: "De Maio Mónica"
-            },
+    const carteraService = new MercantilCarteraService();
 
-            {
-                codigo: 96826,
-                nombre: "Oggero Cristian"
-            }
-        ];
+    console.log("");
+    console.log("========================================");
+    console.log("RIESGOS RELEVANTES MERCANTIL");
+    console.log("========================================");
+    console.log("");
+    const resultadoFinal: RiesgoMercantil[] = [];
 
-        const carteraService =  new MercantilCarteraService();
+    for (const productor of productores) {
 
-        for (const productor of PRODUCTORES) {
+        console.log("");
+        console.log("========================================");
+        console.log(`${productor.nombre} (${productor.codigo})`);
+        console.log("========================================");
 
-            console.log("");
-            console.log("=================================");
-            console.log(
-                `${productor.nombre} (${productor.codigo})`
-            );
-            console.log("=================================");
+        try {
 
             const cartera = await carteraService.obtenerCarteraCompleta(productor.codigo);
 
             console.log(`Pólizas encontradas: ${cartera.getCantidad()}`);
 
+            const riesgosDetectados: RiesgoMercantil[] = [];
+
+            for (const poliza of cartera.getPolizas()) {
+
                 try {
 
-                    const manager = await carteraService.obtenerCarteraCompleta(productor.codigo);
+                    const bienes = await carteraService.obtenerBienesPoliza(poliza.poliza,poliza.endoso);
+
+                    const detalle = await carteraService.obtenerDetallePoliza(poliza.poliza,poliza.endoso);
+
+                    const esFlota = cartera.esFlota(poliza);
+
+                    const prima = detalle.getPrima();
+
+                    const riesgoImportante =  prima >= 5_000_000;
+
+                    if ( esFlota || riesgoImportante) {
+
+                        riesgosDetectados.push({
+                            codigoProductor: productor.codigo,
+                            nombreProductor: productor.nombre,
+                        
+                            tipo: esFlota ? "FLOTA" : "PRIMA_ALTA",
+                            poliza: poliza.poliza,
+                            asegurado:poliza.nombreAsegurado,               
+                            bien: poliza.bienAsegurado,
+                            cantidadBienes: bienes.getCantidadBienes(),
+                            prima,
+                            cobertura: detalle.getCobertura(),
+                            desde: poliza.desde,
+                            hasta: poliza.hasta,
+                            diasParaVencer: calcularDiasRestantes(poliza.hasta)});
+                            
+                    }
 
                     
-                     const flotas =  manager.getFlotas();
-                    
-                    console.log(
-                        `Flotas encontradas: ${flotas.length}`
-                    );
-                    
-                    for (const flota of flotas) {
-                    
-                        console.log({
-                            poliza: flota.poliza,
-                            asegurado: flota.nombreAsegurado,
-                            bienAsegurado: flota.bienAsegurado
-                        });
-                    }
-                
 
                 } catch (error: any) {
 
-        
+                    console.error(`Error analizando póliza ${poliza.poliza}`);
+
+                    console.error(error?.message);
                 }
             }
 
+            console.log("");
+            console.log(`Riesgos detectados: ${riesgosDetectados.length}`);
+            resultadoFinal.push(...riesgosDetectados);
 
-        
+            for (const riesgo of riesgosDetectados) {
+
+                console.log("");
+                console.log("--------------------------------");
+
+                console.log(`Póliza: ${riesgo.poliza}`);
+
+                console.log(`Asegurado: ${riesgo.asegurado}`);
+
+                console.log(`Bien: ${riesgo.bien}`);
+
+                console.log(`Cobertura: ${riesgo.cobertura}`);
+
+                console.log(`Cantidad bienes: ${riesgo.cantidadBienes}`);
+
+                console.log(`Flota: ${riesgo.tipo === "FLOTA" ? "SI" : "NO"}`);
+
+                console.log(`Prima anual: $${riesgo.prima.toLocaleString("es-AR")}`);
+
+                console.log(`Vence: ${riesgo.hasta}`);
+                
+                console.log(`Días para vencer: ${riesgo.diasParaVencer}`);
+            }
+
+        } catch (error: any) {
+
+            console.error(`Error procesando productor ${productor.codigo}`);
+
+            console.error(error?.message);
+        }
+    }
+
+
+    console.log("");
+    console.log("========================================");
+    console.log("RESUMEN GENERAL");
+    console.log("========================================");
+
+    console.log(`Total oportunidades: ${resultadoFinal.length}`);
+
+    console.log(`Flotas: ${resultadoFinal.filter(r => r.tipo === "FLOTA").length}`);
+
+    console.log(`Primas altas: ${resultadoFinal.filter(r => r.tipo === "PRIMA_ALTA").length}`);
+
+    resultadoFinal.sort((a, b) => a.diasParaVencer - b.diasParaVencer);
+
+
+    guardarJson(resultadoFinal,"mercantil-riesgos.json");  
+
 
     } catch (error) {
 

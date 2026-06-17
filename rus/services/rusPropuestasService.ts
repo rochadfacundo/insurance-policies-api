@@ -13,8 +13,7 @@ export async function obtenerPropuestas(body: RusPropuestasRequest): Promise<Rus
 
     const token = await obtenerTokenRUS();
 
-    const response =
-        await axios.post<RusPropuestasResponse>(
+    const response = await axios.post<RusPropuestasResponse>(
             `${config.baseUrl}/propuestas/propuestas`,
             body,
             {
@@ -43,8 +42,7 @@ export async function obtenerDetallePropuesta(
 
         const token = await obtenerTokenRUS();
 
-        const url =
-            `${config.baseUrl}/propuestas/propuestas/${numeroRamo}/${numeroPropuesta}/${numeroEndoso}/${numeroRenovacion}`;
+        const url = `${config.baseUrl}/propuestas/propuestas/${numeroRamo}/${numeroPropuesta}/${numeroEndoso}/${numeroRenovacion}`;
 
         console.log("CONSULTANDO DETALLE:");
         console.log(url);

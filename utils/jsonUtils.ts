@@ -11,7 +11,7 @@ import fs from "fs";
 */
 export function guardarJson(data: any[], path: string): void {
 
-    fs.writeFileSync(path,JSON.stringify(data,null,));
+    fs.writeFileSync(path,JSON.stringify(data,null,2));
     
-    console.log("Archivo generado: mercantil-riesgos.json");
+    console.log(`Archivo generado: ${path}`);
 }

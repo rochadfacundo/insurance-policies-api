@@ -18,23 +18,17 @@ export interface RusPropuestasResponse {
 export interface RusPropuesta {
 
     id: number;
-
     estadoPoliza: string;
-
     seccion: string;
     numeroSeccion: number;
-
     propuesta: number;
     renovacion: number;
     endoso: number;
-
     premio: number;
     cantidadCuota: number;
     cuota: number;
-
     fechaCarga: string;
     fechaEmision: string;
-
     inicioVigencia: string;
     finVigencia: string;
 

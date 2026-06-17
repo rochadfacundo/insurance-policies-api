@@ -47,7 +47,14 @@ async function main() {
             r.prima,
 
         "Cobertura":
-            r.cobertura
+            r.cobertura,
+        "Dias para vencer":
+            r.diasParaVencer,
+        "Desde":
+        r.desde,
+        "Hasta":
+        r.hasta,
+
     }));
 
     const workbook =

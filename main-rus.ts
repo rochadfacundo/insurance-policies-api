@@ -1,62 +1,167 @@
+import { RiesgoRUS } from "./rus/models/riesgoRus";
+import { obtenerProductoresRUS } from "./rus/productoresRUS";
 import { RusCarteraService } from "./rus/services/rusCarteraService";
-import { obtenerDetallePropuesta } from "./rus/services/rusPropuestasService";
+
+import { guardarJson } from "./utils/jsonUtils";
+import { calcularDiasRestantes } from "./utils/utils";
 
 async function main() {
 
     try {
 
-        const PRODUCTOR = 10571;
-        const FECHA_EMISION = "2026-05-27";
+        const PREMIO_ALTO = 7_000_000;
 
+        const productores = obtenerProductoresRUS().filter(p => p.estado_id === 1);
 
+        const carteraService = new RusCarteraService();
 
-        const pruebas: [number, number, number, number][] = [
-            [4, 7933416, 1, 0],
-            [4, 7235127, 1, 9]
-        ];
-        
-        for (const [ramo, propuesta, endoso, renovacion] of pruebas) {
-        
+        const resultadoFinal: RiesgoRUS[] = [];
+
+        console.log("");
+        console.log("========================================");
+        console.log("RIESGOS RELEVANTES RUS");
+        console.log("========================================");
+        console.log("");
+
+        for (const productor of productores) {
+
+            console.log("");
+            console.log("========================================");
+            console.log(`${productor.nombre} (${productor.codigo})`);
+            console.log("========================================");
+
             try {
-        
+
+                const cartera = await carteraService.obtenerUltimoAnio(productor.codigo);
+
+                console.log(`Propuestas encontradas: ${cartera.getCantidad()}`);
+
+                const riesgosDetectados: RiesgoRUS[] = [];
+
+                for (const propuesta of cartera.getPropuestas()) {
+
+                    try {
+
+                        const emitida = propuesta.estadoPoliza.trim() === "EMITIDA";
+                    
+                        const vigente = propuesta.vigenciaEstado.trim() === "VIGENTE";
+                    
+                    if (!emitida || !vigente) {
+                        continue;
+                    }
+                    
+                    if (propuesta.premio <= 0) {
+                        continue;
+                    }
+
+                    riesgosDetectados.push({
+
+                        codigoProductor: productor.codigo,
+                    
+                        nombreProductor: productor.nombre,
+                    
+                        poliza: propuesta.numeroPoliza,
+                    
+                        asegurado: propuesta.razonSocial.trim(),
+                    
+                        patente: propuesta.patente,
+                    
+                        cantidadVehiculos: propuesta.cantidadVehiculos,
+                    
+                        interesAsegurable: propuesta.interesAsegurable,
+                    
+                        premio: propuesta.premio,
+                    
+                        cobertura: propuesta.cobertura.trim(),
+                    
+                        desde: propuesta.inicioVigencia,
+                    
+                        hasta: propuesta.finVigencia,
+                    
+                        diasParaVencer:
+                            calcularDiasRestantes(
+                                propuesta.finVigencia
+                            ),
+                    
+                        estadoPoliza:
+                            propuesta.estadoPoliza.trim(),
+                    
+                        vigenciaEstado:
+                            propuesta.vigenciaEstado.trim(),
+                    
+                        seccion:
+                            propuesta.seccion,
+                    
+                        numeroSeccion:
+                            propuesta.numeroSeccion
+                    });
+
+                    } catch (error: any) {
+
+                        console.error(`Error analizando propuesta ${propuesta.propuesta}`);
+
+                        console.error(error?.message);
+                    }
+                }
+
                 console.log("");
-                console.log("=================================");
-                console.log(
-                    `PROBANDO ${ramo}/${propuesta}/${endoso}/${renovacion}`
-                );
-                console.log("=================================");
+                console.log(`Riesgos detectados: ${riesgosDetectados.length}`);
 
+                resultadoFinal.push(...riesgosDetectados);
 
-        
-                const detalle =
-                    await obtenerDetallePropuesta(
-                        ramo,
-                        propuesta,
-                        endoso,
-                        renovacion
-                    );
-        
-                console.log(
-                    JSON.stringify(
-                        detalle,
-                        null,
-                        2
-                    )
-                );
-        
-            } catch {
-        
-                console.log(
-                    "No respondió."
-                );
+                for (const riesgo of riesgosDetectados) {
+
+                    console.log("");
+                    console.log("--------------------------------");
+
+                    console.log(`Póliza: ${riesgo.poliza}`);
+
+                    console.log(`Asegurado: ${riesgo.asegurado}`);
+
+                    console.log(`Tipo: ${riesgo.tipo}`);
+
+                    console.log(`Es flota: ${riesgo.tipo === "FLOTA" ? "SI" : "NO"}`);
+
+                    console.log(`Premio: $${riesgo.premio.toLocaleString("es-AR")}`);
+
+                    console.log(`Cobertura: ${riesgo.cobertura}`);
+
+                    console.log(`Sección: ${riesgo.seccion}`);
+
+                    console.log(`Vence: ${riesgo.hasta}`);
+
+                    console.log(`Días para vencer: ${riesgo.diasParaVencer}`);
+                }
+
+            } catch (error: any) {
+
+                console.error(`Error procesando productor ${productor.codigo}`);
+
+                console.error(error?.message);
             }
         }
 
+        console.log("");
+        console.log("========================================");
+        console.log("RESUMEN GENERAL");
+        console.log("========================================");
+
+        console.log(`Total oportunidades: ${resultadoFinal.length}`);
+
+        console.log(`Flotas: ${resultadoFinal.filter( r => r.tipo === "FLOTA").length}`);
+
+        console.log(`Premios altos: ${resultadoFinal.filter( r => r.tipo === "PREMIO_ALTO").length}`);
+
+        resultadoFinal.sort( (a, b) => a.diasParaVencer - b.diasParaVencer);
+
+        console.log("");
+        console.log("Exportando JSON...");
+
+        guardarJson(resultadoFinal,"rus-riesgos.json");
+
     } catch (error) {
 
-        console.error(
-            "ERROR OBTENIENDO DETALLE:"
-        );
+        console.error("ERROR ANALIZANDO CARTERA RUS:");
 
         console.error(error);
     }

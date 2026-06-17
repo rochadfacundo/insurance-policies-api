@@ -108,11 +108,7 @@ export class RusPropuestasManager {
      */
     getRiesgosRelevantes(premioMinimo: number = 5000000): RusPropuesta[] {
 
-        return this.propuestas.filter(
-            p =>
-                p.esFlota ||
-                p.premio >= premioMinimo
-        );
+        return this.propuestas.filter(p => p.esFlota || p.premio >= premioMinimo);
     }
 
     /**

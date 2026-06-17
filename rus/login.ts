@@ -1,10 +1,6 @@
 import axios from "axios";
 
-import {
-    guardarToken,
-    leerToken,
-    tokenExpirado
-} from "../utils/tokenUtils";
+import {guardarToken, leerToken, tokenExpirado} from "../utils/tokenUtils";
 
 import { getRusConfig } from "./config";
 
@@ -31,20 +27,16 @@ export async function obtenerTokenRUS(): Promise<string> {
             },
             {
                 headers: {
-                    "x-api-key":
-                        config.apiKey,
-                    "Content-Type":
-                        "application/json"
+                    "x-api-key": config.apiKey,
+                    "Content-Type": "application/json"
                 }
             }
         );
 
     guardarToken(tokenKey,
         {
-            access_token:
-                response.data.access_token,
-            refresh_token:
-                response.data.refresh_token
+            access_token: response.data.access_token,
+            refresh_token: response.data.refresh_token
         }
     );
 

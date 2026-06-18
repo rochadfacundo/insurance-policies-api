@@ -118,10 +118,6 @@ async function main() {
 
                     console.log(`Asegurado: ${riesgo.asegurado}`);
 
-                    console.log(`Tipo: ${riesgo.tipo}`);
-
-                    console.log(`Es flota: ${riesgo.tipo === "FLOTA" ? "SI" : "NO"}`);
-
                     console.log(`Premio: $${riesgo.premio.toLocaleString("es-AR")}`);
 
                     console.log(`Cobertura: ${riesgo.cobertura}`);
@@ -148,11 +144,8 @@ async function main() {
 
         console.log(`Total oportunidades: ${resultadoFinal.length}`);
 
-        console.log(`Flotas: ${resultadoFinal.filter( r => r.tipo === "FLOTA").length}`);
-
-        console.log(`Premios altos: ${resultadoFinal.filter( r => r.tipo === "PREMIO_ALTO").length}`);
-
-        resultadoFinal.sort( (a, b) => a.diasParaVencer - b.diasParaVencer);
+        //resultadoFinal.sort( (a, b) => a.diasParaVencer - b.diasParaVencer);
+        resultadoFinal.sort((a, b) => b.premio - a.premio);
 
         console.log("");
         console.log("Exportando JSON...");

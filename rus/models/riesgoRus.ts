@@ -2,7 +2,6 @@ export interface RiesgoRUS {
 
     codigoProductor: number;
     nombreProductor?: string;
-    tipo: "FLOTA" | "PREMIO_ALTO";
     poliza: number;
     asegurado: string;
     patente: string | null;

@@ -127,21 +127,64 @@ export class RusCarteraService {
     /**
      * Obtiene cartera para un productor dentro de un rango de fechas.
      */
-    async obtenerCarteraPorRango(productor: number,fechaDesde: string,fechaHasta: string): Promise<RusPropuestasManager> {
-
-        const fechas = this.generarRangoFechas(fechaDesde, fechaHasta);
+    async obtenerCarteraPorRango(
+        productor: number,
+        fechaDesde: string,
+        fechaHasta: string
+    ): Promise<RusPropuestasManager> {
+    
+        const fechas = this.generarRangoFechas(
+            fechaDesde,
+            fechaHasta
+        );
+    
         const propuestasAcumuladas: RusPropuesta[] = [];
-
+    
         for (const fecha of fechas) {
-
-            const response = await this.obtenerPorFecha(productor, fecha);
-
-            propuestasAcumuladas.push(...response.results);
+    
+            try {
+    
+                const response =
+                    await this.obtenerPorFecha(
+                        productor,
+                        fecha
+                    );
+    
+                if (!Array.isArray(response?.results)) {
+    
+                    console.log(
+                        `Respuesta sin results - Productor ${productor} - Fecha ${fecha}`
+                    );
+    
+                    continue;
+                }
+    
+                propuestasAcumuladas.push(
+                    ...response.results
+                );
+    
+            } catch (error: any) {
+    
+                console.error(
+                    `Error consultando productor ${productor} fecha ${fecha}`
+                );
+    
+                console.error(
+                    error?.response?.status ?? error?.message
+                );
+    
+                continue;
+            }
         }
-
-        const propuestasSinDuplicados = this.eliminarDuplicados(propuestasAcumuladas);
-
-        return this.crearManagerDesdePropuestas(propuestasSinDuplicados);
+    
+        const propuestasSinDuplicados =
+            this.eliminarDuplicados(
+                propuestasAcumuladas
+            );
+    
+        return this.crearManagerDesdePropuestas(
+            propuestasSinDuplicados
+        );
     }
 
     /**

@@ -1,3 +1,5 @@
+import { TipoRiesgo } from "../../models/TipoRiesgo";
+
 export interface RiesgoRUS {
 
     codigoProductor: number;
@@ -15,6 +17,7 @@ export interface RiesgoRUS {
     diasParaVencer: number;
     seccion: string;
     numeroSeccion: number;
+    tipo: TipoRiesgo;
     interesAsegurable: string | null;
     
 }

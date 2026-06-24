@@ -5,11 +5,14 @@ import { Productor } from "../../models/productor";
 
 export function obtenerProductoresMercantil(): Productor[] {
 
-    const ruta = path.resolve(__dirname,"data","productores.json");
+    const ruta = path.resolve(__dirname,"data","productoresMA.json");
 
     const contenido = fs.readFileSync(ruta,"utf8");
 
     console.log(contenido);
 
-    return JSON.parse(contenido);
+    const productores: Productor[] = JSON.parse(contenido);
+
+
+    return productores.filter(p => p.estado_id === 1);
 }

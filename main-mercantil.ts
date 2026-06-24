@@ -11,7 +11,7 @@ async function main() {
     try {
 
 
-    const productores = obtenerProductoresMercantil().filter(p => p.estado_id === 1);
+    const productores = obtenerProductoresMercantil();
 
     const carteraService = new MercantilCarteraService();
 

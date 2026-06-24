@@ -26,6 +26,8 @@ export class RusPropuestasManager {
     private readonly total: number;
     private readonly propuestas: RusPropuesta[];
 
+    private readonly SECCION_AUTOMOTOR=4;
+
     constructor(private readonly response: RusPropuestasResponse) {
     
         this.validarResponse(this.response);
@@ -74,10 +76,18 @@ export class RusPropuestasManager {
 
     /**
      * Obtiene únicamente propuestas de flotas.
-     */
+    */
     getFlotas(): RusPropuesta[] {
 
         return this.propuestas.filter(p => p.esFlota);
+    }
+
+    /**
+     * Obtiene true si es flota
+    */
+    esFlota(propuesta:RusPropuesta) : boolean {
+        
+        return propuesta.numeroSeccion === this.SECCION_AUTOMOTOR && propuesta.esFlota;
     }
 
     /**
@@ -106,7 +116,7 @@ export class RusPropuestasManager {
      * - Flotas
      * - Primas superiores al importe indicado
      */
-    getRiesgosRelevantes(premioMinimo: number = 5000000): RusPropuesta[] {
+    private getRiesgosRelevantes(premioMinimo: number = 5000000): RusPropuesta[] {
 
         return this.propuestas.filter(p => p.esFlota || p.premio >= premioMinimo);
     }

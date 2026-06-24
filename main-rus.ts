@@ -1,4 +1,5 @@
 import { RiesgoRUS } from "./rus/models/riesgoRus";
+import { TipoRiesgo } from "./models/TipoRiesgo";
 import { obtenerProductoresRUS } from "./rus/productoresRUS";
 import { RusCarteraService } from "./rus/services/rusCarteraService";
 
@@ -11,7 +12,7 @@ async function main() {
 
         const PREMIO_ALTO = 7_000_000;
 
-        const productores = obtenerProductoresRUS().filter(p => p.estado_id === 1);
+        const productores = obtenerProductoresRUS();
 
         const carteraService = new RusCarteraService();
 
@@ -50,9 +51,28 @@ async function main() {
                         continue;
                     }
                     
+                    /*
                     if (propuesta.premio <= 0) {
                         continue;
                     }
+                    */
+
+                    const esFlota = cartera.esFlota(propuesta);
+
+                    let esPremioAlto: boolean = false; 
+
+                    const tipo: TipoRiesgo = esFlota ? TipoRiesgo.FLOTA : TipoRiesgo.PREMIO_ALTO;
+    
+                    if(tipo===TipoRiesgo.PREMIO_ALTO){
+                        esPremioAlto = propuesta.premio >= PREMIO_ALTO;
+
+
+                        if(!esPremioAlto){
+                            continue;
+                        }
+                    }
+
+                    
 
                     riesgosDetectados.push({
 
@@ -78,22 +98,17 @@ async function main() {
                     
                         hasta: propuesta.finVigencia,
                     
-                        diasParaVencer:
-                            calcularDiasRestantes(
-                                propuesta.finVigencia
-                            ),
+                        diasParaVencer: calcularDiasRestantes(propuesta.finVigencia),
+
+                        tipo,
                     
-                        estadoPoliza:
-                            propuesta.estadoPoliza.trim(),
+                        estadoPoliza: propuesta.estadoPoliza.trim(),
                     
-                        vigenciaEstado:
-                            propuesta.vigenciaEstado.trim(),
+                        vigenciaEstado: propuesta.vigenciaEstado.trim(),
                     
-                        seccion:
-                            propuesta.seccion,
+                        seccion: propuesta.seccion,
                     
-                        numeroSeccion:
-                            propuesta.numeroSeccion
+                        numeroSeccion: propuesta.numeroSeccion
                     });
 
                     } catch (error: any) {

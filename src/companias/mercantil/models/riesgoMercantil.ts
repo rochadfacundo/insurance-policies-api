@@ -1,9 +1,11 @@
+import { TipoRiesgo } from "../../../models/TipoRiesgo";
+
 export interface RiesgoMercantil {
 
     codigoProductor: number;
     nombreProductor: string;
 
-    tipo: "FLOTA" | "PRIMA_ALTA";
+    tipo: TipoRiesgo;
 
     poliza: number;
 

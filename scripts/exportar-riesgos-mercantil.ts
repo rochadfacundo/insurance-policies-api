@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import * as XLSX from "xlsx";
-import { RiesgoMercantil } from "./mercantil/models/riesgoMercantil";
+import { RiesgoMercantil } from "../src/companias/mercantil/models/riesgoMercantil";
 
 
 

@@ -1,10 +1,10 @@
-import { RiesgoRUS } from "./rus/models/riesgoRus";
-import { TipoRiesgo } from "./models/TipoRiesgo";
-import { obtenerProductoresRUS } from "./rus/productoresRUS";
-import { RusCarteraService } from "./rus/services/rusCarteraService";
+import { RiesgoRUS } from "../src/companias/rus/models/riesgoRus";
+import { TipoRiesgo } from "../src/models/TipoRiesgo";
+import { obtenerProductoresRUS } from "../src/companias/rus/productoresRUS";
+import { RusCarteraService } from "../src/companias/rus/services/rusCarteraService";
 
-import { guardarJson } from "./utils/jsonUtils";
-import { calcularDiasRestantes } from "./utils/utils";
+import { guardarJson } from "../src/utils/jsonUtils";
+import { calcularDiasRestantes } from "../src/utils/utils";
 
 async function main() {
 
@@ -165,7 +165,7 @@ async function main() {
         console.log("");
         console.log("Exportando JSON...");
 
-        guardarJson(resultadoFinal,"rus-riesgos.json");
+        guardarJson(resultadoFinal,"rus-riesgos3.json");
 
     } catch (error) {
 

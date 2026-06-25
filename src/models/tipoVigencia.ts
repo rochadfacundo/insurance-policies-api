@@ -1,0 +1,9 @@
+export enum TipoVigencia {
+    MENSUAL = 'MENSUAL',
+    BIMESTRAL = 'BIMESTRAL',
+    TRIMESTRAL = 'TRIMESTRAL',
+    CUATRIMESTRAL = 'CUATRIMESTRAL',
+    SEMESTRAL = 'SEMESTRAL',
+    ANUAL = 'ANUAL',
+    OTRA = 'OTRA'
+  }

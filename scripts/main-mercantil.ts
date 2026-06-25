@@ -1,9 +1,10 @@
-import { obtenerProductoresMercantil } from "./mercantil/models/productoresMercantil";
-import { RiesgoMercantil } from "./mercantil/models/riesgoMercantil";
-import { MercantilCarteraService } from "./mercantil/services/mercantilCarteraService";
-import { guardarJson } from "./utils/jsonUtils";
+import { obtenerProductoresMercantil } from "../src/companias/mercantil/models/productoresMercantil";
+import { RiesgoMercantil } from "../src/companias/mercantil/models/riesgoMercantil";
+import { MercantilCarteraService } from "../src/companias/mercantil/services/mercantilCarteraService";
+import { TipoRiesgo } from "../src/models/TipoRiesgo";
+import { guardarJson } from "../src/utils/jsonUtils";
 
-import { calcularDiasRestantes } from "./utils/utils";
+import { calcularDiasRestantes } from "../src/utils/utils";
 
 
 async function main() {
@@ -57,7 +58,7 @@ async function main() {
                             codigoProductor: productor.codigo,
                             nombreProductor: productor.nombre,
                         
-                            tipo: esFlota ? "FLOTA" : "PRIMA_ALTA",
+                            tipo: esFlota ? TipoRiesgo.FLOTA : TipoRiesgo.PRIMA_ALTA,
                             poliza: poliza.poliza,
                             asegurado:poliza.nombreAsegurado,               
                             bien: poliza.bienAsegurado,
@@ -65,8 +66,8 @@ async function main() {
                             prima,
                             cobertura: detalle.getCobertura(),
                             desde: poliza.desde,
-                            hasta: poliza.hasta,
-                            diasParaVencer: calcularDiasRestantes(poliza.hasta)});
+                            hasta: poliza.finPoliza,
+                            diasParaVencer: calcularDiasRestantes(poliza.finPoliza)});
                             
                     }
 

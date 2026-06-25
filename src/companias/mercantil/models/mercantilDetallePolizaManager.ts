@@ -22,6 +22,13 @@ export class MercantilDetallePolizaManager {
         return this.detalle.poliza;
     }
 
+    /**
+     * Devuelve el modelo original.
+     */
+    getModel(): MercantilDetallePoliza {
+        return this.detalle;
+    }
+
     /*
         * Devuelve el número de endoso de la póliza.
         * Útil para identificar la versión específica de la póliza.

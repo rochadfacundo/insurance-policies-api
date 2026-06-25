@@ -1,4 +1,4 @@
-import { formatearFecha } from "../../utils/utils";
+import { formatearFecha } from "../../../utils/utils";
 import { RusPropuesta, RusPropuestasRequest, RusPropuestasResponse } from "../models/rusPropuestasInterfaces";
 import { RusPropuestasManager } from "../models/rusPropuestasManager";
 import { obtenerDetallePropuesta, obtenerPropuestas } from "./rusPropuestasService";

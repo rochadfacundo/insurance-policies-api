@@ -3,7 +3,7 @@ import axios from "axios";
 import dotenv from "dotenv";
 import path from "path";
 
-import {guardarToken,leerToken,tokenExpirado } from "../utils/tokenUtils";
+import {guardarToken,leerToken,tokenExpirado } from "../../utils/tokenUtils";
 
 dotenv.config({path: path.resolve(__dirname, "../.env")});
 

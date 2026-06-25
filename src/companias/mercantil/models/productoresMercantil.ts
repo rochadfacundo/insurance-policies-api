@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from "path";
-import { Productor } from "../../models/productor";
+import { Productor } from "../../../models/productor";
 
 
 export function obtenerProductoresMercantil(): Productor[] {
@@ -14,5 +14,5 @@ export function obtenerProductoresMercantil(): Productor[] {
     const productores: Productor[] = JSON.parse(contenido);
 
 
-    return productores.filter(p => p.estado_id === 1);
+    return productores;
 }

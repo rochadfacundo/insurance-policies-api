@@ -1,4 +1,4 @@
-import { TipoRiesgo } from "../../models/TipoRiesgo";
+import { TipoRiesgo } from "../../../models/TipoRiesgo";
 
 export interface RiesgoRUS {
 

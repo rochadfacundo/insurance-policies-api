@@ -1,6 +1,6 @@
 import axios from "axios";
 
-import {guardarToken, leerToken, tokenExpirado} from "../utils/tokenUtils";
+import {guardarToken, leerToken, tokenExpirado} from "../../utils/tokenUtils";
 
 import { getRusConfig } from "./config";
 

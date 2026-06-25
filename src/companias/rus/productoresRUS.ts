@@ -9,5 +9,5 @@ export interface ProductorRUS {
 }
 
 export function obtenerProductoresRUS(): ProductorRUS[] {
-    return productores.filter(p => p.estado_id === 1) as ProductorRUS[];
+    return productores2.filter(p => p.estado_id === 1) as ProductorRUS[];
 }

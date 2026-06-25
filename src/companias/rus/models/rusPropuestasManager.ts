@@ -17,7 +17,7 @@
  * La obtención de datos corresponde al RusPropuestasService.
  */
 
-import { parseFecha } from "../../utils/utils";
+import { parseFecha } from "../../../utils/utils";
 import { RusPropuesta, RusPropuestasResponse} from "./rusPropuestasInterfaces";
 
 export class RusPropuestasManager {

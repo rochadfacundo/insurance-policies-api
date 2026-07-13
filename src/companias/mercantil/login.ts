@@ -5,7 +5,7 @@ import path from "path";
 
 import {guardarToken,leerToken,tokenExpirado } from "../../utils/tokenUtils";
 
-dotenv.config({path: path.resolve(__dirname, "../.env")});
+dotenv.config({path: path.resolve(__dirname, "../../../.env") });
 
 const BASE_URL = process.env.MA_BASE_URL!;
 

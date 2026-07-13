@@ -2,9 +2,7 @@ import dotenv from "dotenv";
 import path from "path";
 import { RusConfig, RusEnv } from "./models/rusConfig";
 
-dotenv.config({path: path.resolve(__dirname, "../.env")});
-
-
+dotenv.config({path: path.resolve(__dirname, "../../../.env")});
 
 export function getRusConfig(): RusConfig {
 

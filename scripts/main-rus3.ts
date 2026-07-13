@@ -1,18 +1,18 @@
 import { RiesgoRUS } from "../src/companias/rus/models/riesgoRus";
 import { TipoRiesgo } from "../src/models/TipoRiesgo";
-import { obtenerProductoresRUS } from "../src/companias/rus/productoresRUS";
+import { obtenerProductoresRUS, obtenerProductoresRUS3 } from "../src/companias/rus/productoresRUS";
 import { RusCarteraService } from "../src/companias/rus/services/rusCarteraService";
 
 import { guardarJson } from "../src/utils/jsonUtils";
 import { calcularDiasRestantes } from "../src/utils/utils";
 
-const ARCHIVO_SALIDA = "rus-riesgos.json";
+const ARCHIVO_SALIDA = "rus-riesgos3.json";
 
 async function main(): Promise<void> {
     try {
         const PREMIO_ALTO = 7_000_000;
 
-        const productores = obtenerProductoresRUS();
+        const productores = obtenerProductoresRUS3();
 
         const carteraService = new RusCarteraService();
 

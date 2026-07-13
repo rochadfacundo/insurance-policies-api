@@ -20,7 +20,19 @@ export interface RiesgoMercantil {
     cobertura: string;
 
     desde: string;
+
+    /**
+     * Fin del período actual de facturación.
+     */
     hasta: string;
 
-    diasParaVencer: number;
+    /**
+     * Fin real de la vigencia de la póliza.
+     */
+    finPoliza: string;
+
+    /**
+     * Días restantes hasta la próxima refacturación.
+     */
+    diasParaRefacturar: number;
 }

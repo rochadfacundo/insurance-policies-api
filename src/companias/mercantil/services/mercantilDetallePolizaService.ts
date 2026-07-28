@@ -12,11 +12,9 @@ dotenv.config({
     )
 });
 
-const BASE_URL =
-    process.env.MA_BASE_URL!;
+const BASE_URL = process.env.MA_BASE_URL!;
 
-const SUBSCRIPTION_KEY =
-    process.env.MA_SUBSCRIPTION_KEY!;
+const SUBSCRIPTION_KEY = process.env.MA_SUBSCRIPTION_KEY!;
 
 /**
  * Obtiene el detalle completo de una póliza.

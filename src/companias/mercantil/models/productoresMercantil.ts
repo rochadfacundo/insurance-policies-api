@@ -9,8 +9,6 @@ export function obtenerProductoresMercantil(): Productor[] {
 
     const contenido = fs.readFileSync(ruta,"utf8");
 
-    console.log(contenido);
-
     const productores: Productor[] = JSON.parse(contenido);
 
 

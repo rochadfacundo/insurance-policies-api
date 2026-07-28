@@ -80,3 +80,8 @@ Thumbs.db
 # annotations
 # =========================
 tip.txt
+
+# =========================
+# credenciales firebase
+# =========================
+credentials/

@@ -123,6 +123,8 @@ export class RusCarteraService {
     }
 
 
+    
+
 
     /**
      * Obtiene cartera para un productor dentro de un rango de fechas.
@@ -139,68 +141,222 @@ export class RusCarteraService {
         );
     
         const propuestasAcumuladas: RusPropuesta[] = [];
-    
+
         for (const fecha of fechas) {
     
             try {
     
-                const response =
-                    await this.obtenerPorFecha(
-                        productor,
-                        fecha
-                    );
+                const response = await this.obtenerPorFecha(productor,fecha);
     
-                if (!Array.isArray(response?.results)) {
-    
-                    console.log(
-                        `Respuesta sin results - Productor ${productor} - Fecha ${fecha}`
-                    );
-    
-                    continue;
-                }
+                    if (!Array.isArray(response?.results)) {
+
+                        throw new Error(
+                            `Respuesta inválida de RUS. ` +
+                            `Productor: ${productor}. ` +
+                            `Fecha: ${fecha}. ` +
+                            `Respuesta: ${JSON.stringify(response)}`
+                        );
+                    }
     
                 propuestasAcumuladas.push(
                     ...response.results
                 );
     
             } catch (error: any) {
-    
-                console.error(
-                    `Error consultando productor ${productor} fecha ${fecha}`
+
+                const status = error?.response?.status;
+            
+                const detalle = error?.response?.data;
+            
+                throw new Error(
+                    `Error consultando RUS. ` +
+                    `Productor: ${productor}. ` +
+                    `Fecha: ${fecha}. ` +
+                    `Status: ${status ?? "sin status"}. ` +
+                    `Detalle: ${detalle
+                            ? JSON.stringify(detalle)
+                            : error?.message
+                    }`
                 );
-    
-                console.error(
-                    error?.response?.status ?? error?.message
-                );
-    
-                continue;
             }
         }
     
-        const propuestasSinDuplicados =
-            this.eliminarDuplicados(
-                propuestasAcumuladas
-            );
+        const propuestasSinDuplicados = this.eliminarDuplicados(propuestasAcumuladas);
     
-        return this.crearManagerDesdePropuestas(
-            propuestasSinDuplicados
-        );
+        return this.crearManagerDesdePropuestas(propuestasSinDuplicados);
     }
 
     /**
-     * Obtiene propuestas de un productor para una fecha puntual.
+     * Obtiene todas las páginas de propuestas
+     * de un productor para una fecha puntual.
      */
-    async obtenerPorFecha(productor: number,fechaEmision: string): Promise<RusPropuestasResponse> {
+    async obtenerPorFecha(productor: number, fechaEmision: string): Promise<RusPropuestasResponse> {
 
-        const request: RusPropuestasRequest = {
-            codigoProductor: [productor],
-            fechaEmision,
-            pagina: this.defaultPagina
+        const propuestasAcumuladas: RusPropuesta[] = [];
+
+        let pagina = this.defaultPagina;
+
+        let totalEsperado: number | null = null;
+
+        while (totalEsperado === null || propuestasAcumuladas.length < totalEsperado) {
+
+            const request: RusPropuestasRequest = {
+                codigoProductor: [productor],
+                fechaEmision,
+                pagina
+            };
+
+            const response = await this.obtenerPropuestasConReintento(request, productor,fechaEmision, pagina);
+
+            if (!response || !response.paging || !Array.isArray(response.results)) {
+                throw new Error(
+                    `Respuesta paginada inválida de RUS. ` +
+                    `Productor: ${productor}. ` +
+                    `Fecha: ${fechaEmision}. ` +
+                    `Página: ${pagina}. ` +
+                    `Respuesta: ${JSON.stringify(response)}`
+                );
+            }
+
+            if (totalEsperado === null) {
+                totalEsperado = response.paging.total;
+            }
+
+            propuestasAcumuladas.push(...response.results);
+
+            if (response.results.length === 0 && propuestasAcumuladas.length < totalEsperado) {
+                throw new Error(
+                    `RUS informó ${totalEsperado} propuestas, ` +
+                    `pero la página ${pagina} vino vacía. ` +
+                    `Productor: ${productor}. ` +
+                    `Fecha: ${fechaEmision}.`
+                );
+            }
+
+            pagina++;
+        }
+
+        return {
+            paging: {
+                total: propuestasAcumuladas.length,
+                limit: propuestasAcumuladas.length,
+                offset: 0
+            },
+            results: propuestasAcumuladas
         };
-
-        return await obtenerPropuestas(request);
     }
 
+    /*
+ * Obtiene propuestas con reintentos en caso de error.
+ * Limita la cantidad de intentos para evitar bucles infinitos.
+ */
+private async obtenerPropuestasConReintento(
+    request: RusPropuestasRequest,
+    productor: number,
+    fechaEmision: string,
+    pagina: number
+): Promise<RusPropuestasResponse> {
+
+    const MAX_INTENTOS = 5;
+
+    const demorasMs = [
+        15_000,
+        30_000,
+        60_000,
+        120_000
+    ];
+
+    let ultimoError: unknown;
+
+    for (
+        let intento = 1;
+        intento <= MAX_INTENTOS;
+        intento++
+    ) {
+
+        try {
+
+            const response = await obtenerPropuestas(request);
+
+            if (
+                response &&
+                response.paging &&
+                Array.isArray(response.results)
+            ) {
+                return response;
+            }
+
+            throw new Error(
+                `Respuesta inválida: ${JSON.stringify(response)}`
+            );
+
+        } catch (error) {
+
+            ultimoError = error;
+
+            if (intento >= MAX_INTENTOS) {
+                break;
+            }
+
+            const demora =
+                demorasMs[intento - 1]
+                ?? 120_000;
+
+            console.warn(
+                `RUS falló. ` +
+                `Reintentando en ${demora / 1000}s. ` +
+                `Intento ${intento}/${MAX_INTENTOS}. ` +
+                `Productor: ${productor}. ` +
+                `Fecha: ${fechaEmision}. ` +
+                `Página: ${pagina}. ` +
+                `Error: ${this.obtenerMensajeError(error)}`
+            );
+
+            await this.esperar(demora);
+        }
+    }
+
+    throw new Error(
+        `RUS falló luego de ${MAX_INTENTOS} intentos. ` +
+        `Productor: ${productor}. ` +
+        `Fecha: ${fechaEmision}. ` +
+        `Página: ${pagina}. ` +
+        `Error: ${this.obtenerMensajeError(ultimoError)}`
+    );
+}
+
+private esperar(
+    milisegundos: number
+): Promise<void> {
+
+    return new Promise(
+        resolve =>
+            setTimeout(
+                resolve,
+                milisegundos
+            )
+    );
+}
+
+private obtenerMensajeError(
+    error: unknown
+): string {
+
+    if (error instanceof Error) {
+        return error.message;
+    }
+
+    if (typeof error === "string") {
+        return error;
+    }
+
+    try {
+        return JSON.stringify(error);
+    } catch {
+        return String(error);
+    }
+}
+    
     /**
      * Obtiene cartera de los últimos X meses.
      */

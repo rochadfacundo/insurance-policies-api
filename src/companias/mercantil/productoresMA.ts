@@ -18,16 +18,11 @@ async function obtenerProductores() {
 
         const token = await obtenerTokenMA();
 
-        const response =
-            await axios.get(`${BASE_URL}/productores/v1`,
+        const response = await axios.get(`${BASE_URL}/productores/v1`,
                 {
                     headers: {
-
-                        Authorization:
-                            `Bearer ${token}`,
-
-                        "Ocp-Apim-Subscription-Key":
-                            SUBSCRIPTION_KEY
+                        Authorization: `Bearer ${token}`,
+                        "Ocp-Apim-Subscription-Key": SUBSCRIPTION_KEY
                     }
 
                     // opcional

@@ -29,6 +29,8 @@ export class MercantilDetallePolizaManager {
         return this.detalle;
     }
 
+
+
     /*
         * Devuelve el número de endoso de la póliza.
         * Útil para identificar la versión específica de la póliza.
@@ -180,5 +182,14 @@ export class MercantilDetallePolizaManager {
 
             cuotas: this.getCantidadCuotas()
         };
+    }
+
+
+    getRamaNombre(): string {
+        return this.detalle.rama.nombre;
+    }
+
+    getRamaId(): number {
+        return this.detalle.rama.id;
     }
 }

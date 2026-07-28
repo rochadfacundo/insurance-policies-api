@@ -13,38 +13,53 @@ dotenv.config({
 });
 
 const BASE_URL = process.env.MA_BASE_URL!;
-
 const SUBSCRIPTION_KEY = process.env.MA_SUBSCRIPTION_KEY!;
-/*
-    * Obtiene los bienes de un item de una póliza.
-    * Si total o cantidad es mayor a 1, se considera flota.
-    * No contiene lógica de negocio, solo delega la consulta a mercantilBienesService.
-    * La lógica de negocio sobre los bienes vive en MercantilBienesPolizaManager.
-    * @param poliza Número de póliza.
-    * @param endoso Número de endoso.
-    * @return Un MercantilBienesPoliza con los bienes del item de la póliza.
-    * @throws Error si la consulta falla.
-    * @see MercantilBienesPolizaManager
-    * @see mercantilBienesService.obtenerBienesPoliza
-*/
-export async function obtenerBienesPoliza(poliza: number,endoso: number): Promise<MercantilBienesPoliza> {
 
-    const token =
-        await obtenerTokenMA();
+/**
+ * Obtiene los bienes de un item de una póliza.
+ *
+ * @param poliza Número de póliza.
+ * @param endoso Número de endoso.
+ * @return Un MercantilBienesPoliza con los bienes del item de la póliza.
+ * @throws Error si la consulta falla.
+ */
+export async function obtenerBienesPoliza(poliza: number, endoso: number): Promise<MercantilBienesPoliza> {
 
-    const response =
-        await axios.get(
+    const token = await obtenerTokenMA();
+
+    try {
+
+        const response = await axios.get<MercantilBienesPoliza>(
             `${BASE_URL}/polizas/v1/${poliza}/${endoso}/bienes`,
             {
                 headers: {
-                    Authorization:
-                        `Bearer ${token}`,
-
-                    "Ocp-Apim-Subscription-Key":
-                        SUBSCRIPTION_KEY
+                    Authorization: `Bearer ${token}`,
+                    "Ocp-Apim-Subscription-Key": SUBSCRIPTION_KEY
                 }
             }
         );
 
-    return response.data;
+        return response.data;
+
+    } catch (error) {
+
+        console.error(
+            `Error obteniendo bienes de la póliza ${poliza}, endoso ${endoso}`
+        );
+
+        if (axios.isAxiosError(error)) {
+
+            console.error("Status:",error.response?.status);
+
+            console.error("Respuesta de Mercantil:",JSON.stringify(
+                    error.response?.data,
+                    null,
+                    2));
+
+        } else {
+            console.error(error);
+        }
+
+        throw error;
+    }
 }

@@ -1,13 +1,10 @@
 import { ECompania } from "../../../models/eCompania";
 import { Poliza } from "../../../models/poliza";
 import { Productor } from "../../../models/productor";
-import { TipoVigencia } from "../../../models/tipoVigencia";
 import { DateUtils } from "../../../utils/dateUtils";
-import { MercantilBienesPoliza } from "../models/mercantilBienesPoliza";
-import { MercantilDetallePoliza } from "../models/mercantilDetallePoliza";
+import { MercantilBienesPolizaManager } from "../models/mercantilBienesPolizaManager";
 import { MercantilDetallePolizaManager } from "../models/mercantilDetallePolizaManager";
 import { MercantilPoliza } from "../models/mercantilModelPolizas";
-import { MercantilBienesPolizaManager } from "../services/mercantilBienesPolizaManager";
 
 export class MercantilPolizaMapper {
 

@@ -3,6 +3,11 @@ export interface MercantilDetallePoliza {
     poliza: number;
     endoso: number;
 
+    rama: {
+        id: number;
+        nombre: string;
+    };
+
     desde: string;
     hasta: string;
     emitido: string;
@@ -21,13 +26,9 @@ export interface MercantilDetallePoliza {
     };
 
     costo: {
-
         premio: number;
-
         prima: number;
-
         primaRC: number;
-
         primaCasco: number;
     };
 }

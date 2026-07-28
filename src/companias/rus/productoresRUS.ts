@@ -1,6 +1,6 @@
-import productores from "./data/productoresRus.json";
-import productores2 from "./data/productoresRus2.json";
-import productores3 from "./data/productoresRus3.json";
+import productores0 from "./data/productoresRus0.json";
+import productores1 from "./data/productoresRus1.json";
+
 
 export interface ProductorRUS {
     codigo: number;
@@ -8,16 +8,11 @@ export interface ProductorRUS {
     estado_id: number;
 }
 
-export function obtenerProductoresRUS(): ProductorRUS[] {
-    return productores.filter(p => p.estado_id === 1) as ProductorRUS[];
+export function obtenerProductoresRUS0(): ProductorRUS[] {
+    return productores0.filter(p => p.estado_id === 1) as ProductorRUS[];
 }
 
 
-export function obtenerProductoresRUS2(): ProductorRUS[] {
-    return productores2.filter(p => p.estado_id === 1) as ProductorRUS[];
-}
-
-
-export function obtenerProductoresRUS3(): ProductorRUS[] {
-    return productores3.filter(p => p.estado_id === 1) as ProductorRUS[];
+export function obtenerProductoresRUS1(): ProductorRUS[] {
+    return productores1.filter(p => p.estado_id === 1) as ProductorRUS[];
 }

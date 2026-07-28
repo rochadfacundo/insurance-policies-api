@@ -1,11 +1,11 @@
+import { MercantilBienesPolizaManager } from "../models/mercantilBienesPolizaManager";
 import { MercantilDetallePolizaManager } from "../models/mercantilDetallePolizaManager";
 import {    MercantilPoliza,    MercantilPolizasResponse} from "../models/mercantilModelPolizas";
 
 import { MercantilPolizasManager }from "../models/mercantilPolizasManager";
-import { MercantilBienesPolizaManager } from "./mercantilBienesPolizaManager";
 import { obtenerBienesPoliza } from "./mercantilBienesService";
 import { obtenerDetallePoliza } from "./mercantilDetallePolizaService";
-
+import axios from "axios";
 import { obtenerPolizasVigentes } from "./mercantilPolizasService";
 
 /**
@@ -32,25 +32,63 @@ export class MercantilCarteraService {
     }
 
     /**
-     * Obtiene los bienes de una póliza específica.
-     * Si total o cantidad es mayor a 1, se considera flota.
-     * Construye un MercantilBienesPolizaManager con la respuesta.
-     * No contiene lógica de negocio, solo delega la consulta a mercantilBienesService.
-     * La lógica de negocio sobre los bienes vive en MercantilBienesPolizaManager.
-     * @param poliza Número de póliza.
-     * @param endoso Número de endoso.
-     * @return Un MercantilBienesPolizaManager con los bienes de la póliza.
-     * @throws Error si la consulta falla.
-     * @see MercantilBienesPolizaManager
-     * @see mercantilBienesService.obtenerBienesPoliza
-     * */
-    async obtenerBienesPoliza(poliza: number,endoso: number): Promise<MercantilBienesPolizaManager> {
-    
-        const bienes =  await obtenerBienesPoliza(poliza, endoso);
-    
+ * Obtiene los bienes de una póliza específica.
+ *
+ * Primero consulta utilizando el endoso informado por la cartera.
+ * Si Mercantil devuelve el error SQL0305 y el endoso es distinto de 0,
+ * reintenta la consulta utilizando el endoso 0.
+ *
+ * @param poliza Número de póliza.
+ * @param endoso Número de endoso informado por la cartera.
+ * @return Un MercantilBienesPolizaManager con los bienes de la póliza.
+ * @throws Error si la consulta original falla por un error diferente a SQL0305
+ * o si también falla el reintento con endoso 0.
+ */
+async obtenerBienesPoliza(poliza: number, endoso: number): Promise<MercantilBienesPolizaManager> {
+
+    try {
+
+        const bienes = await obtenerBienesPoliza(poliza,endoso);
+
         return new MercantilBienesPolizaManager(bienes);
+
+    } catch (error) {
+
+        const puedeReintentar = endoso !== 0 && this.esErrorSql0305(error);
+
+        if (!puedeReintentar) {
+            throw error;
+        }
+
+        console.warn(`Mercantil devolvió SQL0305 para la póliza ${poliza}, ` + `endoso ${endoso}. Reintentando bienes con endoso 0...`);
+
+        const bienesEndosoCero = await obtenerBienesPoliza(poliza,0);
+
+        console.warn(`Fallback exitoso para la póliza ${poliza}: ` +`se utilizaron los bienes del endoso 0 en lugar del endoso ${endoso}.`);
+
+        return new MercantilBienesPolizaManager(bienesEndosoCero);
+    }
+}
+
+
+/**
+ * Verifica si Mercantil respondió con el error interno SQL0305.
+ */
+private esErrorSql0305(error: unknown): boolean {
+
+    if (!axios.isAxiosError(error)) {
+        return false;
     }
 
+    const data = error.response?.data as {
+        errores?: Array<{
+            id?: string;
+            texto?: string;
+        }>;
+    } | undefined;
+
+    return data?.errores?.some(item => item.id === "SQL0305") ?? false;
+}
     async obtenerDetallePoliza(poliza: number, endoso: number): Promise<MercantilDetallePolizaManager> {
     
         const detalle = await obtenerDetallePoliza(poliza,endoso);

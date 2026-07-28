@@ -14,11 +14,9 @@ const SUBSCRIPTION_KEY = process.env.MA_SUBSCRIPTION_KEY!;
 export async function obtenerPolizasVigentes(productor: number,limit: number = 20,offset: number = 0)
 : Promise<MercantilPolizasResponse> {
 
-    const token =
-        await obtenerTokenMA();
+    const token = await obtenerTokenMA();
 
-    const response =
-        await axios.get<MercantilPolizasResponse>(
+    const response = await axios.get<MercantilPolizasResponse>(
             `${BASE_URL}/cartera/v1/productores/${productor}/polizas/vigentes`,
             {
                 headers: {

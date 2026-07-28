@@ -1,204 +1,273 @@
-import { RiesgoRUS } from "../src/companias/rus/models/riesgoRus";
-import { TipoRiesgo } from "../src/models/TipoRiesgo";
-import { obtenerProductoresRUS, obtenerProductoresRUS2 } from "../src/companias/rus/productoresRUS";
-import { RusCarteraService } from "../src/companias/rus/services/rusCarteraService";
+import axios from "axios";
 
-import { guardarJson } from "../src/utils/jsonUtils";
-import { calcularDiasRestantes } from "../src/utils/utils";
+import { getRusConfig } from "../src/companias/rus/config";
 
-const ARCHIVO_SALIDA = "rus-riesgos2.json";
+const PRODUCTOR = 8381;
+const FECHA_EMISION = "2026-07-27";
 
 async function main(): Promise<void> {
+
+    console.log("");
+    console.log("==================================================");
+    console.log("TEST DE AUTENTICACIÓN RUS - ORGANIZADOR");
+    console.log("==================================================");
+
     try {
-        const PREMIO_ALTO = 7_000_000;
 
-        const productores = obtenerProductoresRUS2();
-
-        const carteraService = new RusCarteraService();
-
-        const resultadoFinal: RiesgoRUS[] = [];
+        const config = getRusConfig();
 
         console.log("");
-        console.log("========================================");
-        console.log("RIESGOS RELEVANTES RUS");
-        console.log("========================================");
+        console.log("CONFIGURACIÓN CARGADA");
+
+        console.log({
+            ambiente: config.env,
+            baseUrl: config.baseUrl,
+            username: enmascararUsuario(config.username),
+            usernameTieneBarra: config.username.includes("/"),
+            apiKeyPresente: Boolean(config.apiKey),
+            apiKeyLongitud: config.apiKey.length
+        });
+
+        /*
+         * LOGIN DIRECTO.
+         *
+         * No utiliza obtenerTokenRUS(), por lo tanto no puede
+         * reutilizar el token anterior guardado en caché.
+         */
         console.log("");
+        console.log("--------------------------------------------------");
+        console.log("1. SOLICITANDO TOKEN NUEVO");
+        console.log("--------------------------------------------------");
 
-        for (const productor of productores) {
-            console.log("");
-            console.log("========================================");
-            console.log(`${productor.nombre} (${productor.codigo})`);
-            console.log("========================================");
+        const loginUrl =
+            `${config.baseUrl}/login/token`;
 
-            try {
-                const cartera =
-                    await carteraService.obtenerUltimoAnio(
-                        productor.codigo
-                    );
-
-                console.log(
-                    `Propuestas encontradas: ${cartera.getCantidad()}`
-                );
-
-                const riesgosDetectados: RiesgoRUS[] = [];
-
-                for (const propuesta of cartera.getPropuestas()) {
-                    try {
-                        const emitida =
-                            propuesta.estadoPoliza.trim() === "EMITIDA";
-
-                        const vigente =
-                            propuesta.vigenciaEstado.trim() === "VIGENTE";
-
-                        if (!emitida || !vigente) {
-                            continue;
-                        }
-
-                        const esFlota =
-                            cartera.esFlota(propuesta);
-
-                        const esPremioAlto =
-                            propuesta.premio >= PREMIO_ALTO;
-
-                        if (!esFlota && !esPremioAlto) {
-                            continue;
-                        }
-
-                        const tipo =
-                            esFlota
-                                ? TipoRiesgo.FLOTA
-                                : TipoRiesgo.PREMIO_ALTO;
-
-                        const fechaRefacturacion =
-                            propuesta.finPeriodoFacturacion ??
-                            propuesta.finVigencia;
-
-                        riesgosDetectados.push({
-                            codigoProductor:
-                                productor.codigo,
-
-                            nombreProductor:
-                                productor.nombre,
-
-                            poliza:
-                                propuesta.numeroPoliza,
-
-                            asegurado:
-                                propuesta.razonSocial.trim(),
-
-                            patente:
-                                propuesta.patente,
-
-                            interesAsegurable:
-                                propuesta.interesAsegurable,
-
-                            cantidadVehiculos:
-                                propuesta.cantidadVehiculos,
-
-                            premio:
-                                propuesta.premio,
-
-                            cobertura:
-                                propuesta.cobertura.trim(),
-
-                            inicioVigencia:
-                                propuesta.inicioVigencia,
-
-                            finVigencia:
-                                propuesta.finVigencia,
-
-                            finPeriodoFacturacion:
-                                fechaRefacturacion,
-
-                            diasParaRefacturar:
-                                calcularDiasRestantes(
-                                    fechaRefacturacion
-                                ),
-
-                            tipo,
-
-                            estadoPoliza:
-                                propuesta.estadoPoliza.trim(),
-
-                            vigenciaEstado:
-                                propuesta.vigenciaEstado.trim(),
-
-                            seccion:
-                                propuesta.seccion,
-
-                            numeroSeccion:
-                                propuesta.numeroSeccion
-                        });
-
-                    } catch (error: any) {
-                        console.error(
-                            `Error analizando propuesta ${propuesta.propuesta}`
-                        );
-
-                        console.error(error?.message);
-                    }
+        const loginResponse =
+            await axios.post(
+                loginUrl,
+                {
+                    username: config.username,
+                    password: config.password
+                },
+                {
+                    headers: {
+                        "x-api-key": config.apiKey,
+                        "Content-Type": "application/json",
+                        Accept: "application/json"
+                    },
+                    timeout: 30_000
                 }
+            );
 
-                console.log("");
-                console.log(
-                    `Riesgos detectados: ${riesgosDetectados.length}`
-                );
+        const token =
+            loginResponse.data?.access_token;
 
-                resultadoFinal.push(...riesgosDetectados);
-
-            } catch (error: any) {
-                console.error(
-                    `Error procesando productor ${productor.codigo}`
-                );
-
-                console.error(error?.message);
-            }
+        if (
+            typeof token !== "string" ||
+            !token.trim()
+        ) {
+            throw new Error(
+                `El login respondió correctamente, pero no devolvió access_token. ` +
+                `Respuesta: ${JSON.stringify(loginResponse.data)}`
+            );
         }
 
+        console.log("Token nuevo obtenido correctamente.");
+
+        console.log({
+            status: loginResponse.status,
+            tokenPresente: true,
+            tokenLongitud: token.length,
+            refreshTokenPresente:
+                Boolean(loginResponse.data?.refresh_token)
+        });
+
+        /*
+         * CONSULTA DIRECTA A PROPUESTAS.
+         */
         console.log("");
-        console.log("========================================");
-        console.log("RESUMEN GENERAL");
-        console.log("========================================");
+        console.log("--------------------------------------------------");
+        console.log("2. CONSULTANDO PROPUESTAS");
+        console.log("--------------------------------------------------");
+
+        const propuestasUrl =
+            `${config.baseUrl}/propuestas/propuestas`;
+
+        const body = {
+            codigoProductor: [
+                PRODUCTOR
+            ],
+            fechaEmision:
+                FECHA_EMISION,
+            pagina:
+                0
+        };
+
+        console.log({
+            url: propuestasUrl,
+            productor: PRODUCTOR,
+            fechaEmision: FECHA_EMISION,
+            pagina: 0
+        });
+
+        const propuestasResponse =
+            await axios.post(
+                propuestasUrl,
+                body,
+                {
+                    headers: {
+                        Authorization:
+                            `Bearer ${token}`,
+
+                        "x-api-key":
+                            config.apiKey,
+
+                        "Content-Type":
+                            "application/json",
+
+                        Accept:
+                            "application/json"
+                    },
+
+                    timeout:
+                        30_000,
+
+                    validateStatus:
+                        () => true
+                }
+            );
+
+        console.log("");
+        console.log("--------------------------------------------------");
+        console.log("3. RESPUESTA DE PROPUESTAS");
+        console.log("--------------------------------------------------");
+
+        console.log({
+            status:
+                propuestasResponse.status,
+
+            statusText:
+                propuestasResponse.statusText
+        });
 
         console.log(
-            `Total oportunidades: ${resultadoFinal.length}`
-        );
-
-        console.log(
-            `Flotas: ${
-                resultadoFinal.filter(
-                    riesgo => riesgo.tipo === TipoRiesgo.FLOTA
-                ).length
-            }`
-        );
-
-        console.log(
-            `Premios altos: ${
-                resultadoFinal.filter(
-                    riesgo => riesgo.tipo === TipoRiesgo.PREMIO_ALTO
-                ).length
-            }`
-        );
-
-        resultadoFinal.sort(
-            (a, b) =>
-                a.diasParaRefacturar -
-                b.diasParaRefacturar
+            JSON.stringify(
+                propuestasResponse.data,
+                null,
+                2
+            )
         );
 
         console.log("");
-        console.log("Exportando JSON...");
+        console.log("==================================================");
+        console.log("DIAGNÓSTICO");
+        console.log("==================================================");
 
-        guardarJson(
-            resultadoFinal,
-            ARCHIVO_SALIDA
+        if (
+            propuestasResponse.status >= 200 &&
+            propuestasResponse.status < 300
+        ) {
+
+            const resultados =
+                Array.isArray(
+                    propuestasResponse.data?.results
+                )
+                    ? propuestasResponse.data.results
+                    : [];
+
+            console.log(
+                "El usuario organizador pudo consultar propuestas correctamente."
+            );
+
+            console.log({
+                resultadosPagina:
+                    resultados.length,
+
+                total:
+                    propuestasResponse.data
+                        ?.paging
+                        ?.total
+            });
+
+            return;
+        }
+
+        if (
+            propuestasResponse.status === 403
+        ) {
+
+            console.log(
+                "El token nuevo fue generado, pero RUS sigue rechazando el acceso a propuestas."
+            );
+
+            console.log(
+                "Esto indicaría que la cuenta organizadora todavía no tiene habilitado el recurso /propuestas/propuestas, o que el productor consultado no está asociado a ese organizador."
+            );
+
+            process.exitCode = 1;
+
+            return;
+        }
+
+        if (
+            propuestasResponse.status === 401
+        ) {
+
+            console.log(
+                "RUS rechazó el token o la API key."
+            );
+
+            process.exitCode = 1;
+
+            return;
+        }
+
+        console.log(
+            `RUS respondió con status inesperado ${propuestasResponse.status}.`
         );
 
-    } catch (error) {
-        console.error("ERROR ANALIZANDO CARTERA RUS:");
+        process.exitCode = 1;
 
-        console.error(error);
+    } catch (error: any) {
+
+        console.error("");
+        console.error("==================================================");
+        console.error("ERROR EN TEST RUS");
+        console.error("==================================================");
+
+        console.error({
+            mensaje:
+                error?.message,
+
+            status:
+                error?.response?.status,
+
+            detalle:
+                error?.response?.data,
+
+            url:
+                error?.config?.url
+        });
+
+        process.exitCode = 1;
     }
+}
+
+function enmascararUsuario(
+    username: string
+): string {
+
+    if (username.length <= 4) {
+        return "***";
+    }
+
+    return (
+        username.substring(0, 3) +
+        "***" +
+        username.substring(
+            username.length - 3
+        )
+    );
 }
 
 main();

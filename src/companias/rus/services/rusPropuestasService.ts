@@ -11,9 +11,9 @@ export async function obtenerPropuestas(body: RusPropuestasRequest): Promise<Rus
 
     const config = getRusConfig();
 
-    const token = await obtenerTokenRUS();
+    const realizarConsulta = async (token: string): Promise<RusPropuestasResponse> => {
 
-    const response = await axios.post<RusPropuestasResponse>(
+        const response = await axios.post(
             `${config.baseUrl}/propuestas/propuestas`,
             body,
             {
@@ -26,7 +26,52 @@ export async function obtenerPropuestas(body: RusPropuestasRequest): Promise<Rus
             }
         );
 
-    return response.data;
+        return response.data;
+    };
+
+    let token = await obtenerTokenRUS();
+
+    let data = await realizarConsulta(token);
+
+    if (esRespuestaNoAutorizada(data)) {
+
+        console.warn(
+            "RUS rechazó el token almacenado. Solicitando uno nuevo..."
+        );
+
+        token = await obtenerTokenRUS(true);
+
+        data = await realizarConsulta(token);
+    }
+
+    if (esRespuestaNoAutorizada(data)) {
+        throw new Error(
+            `RUS rechazó también el token renovado. ` +
+            `Respuesta: ${JSON.stringify(data)}`
+        );
+    }
+
+    return data;
+}
+
+/*
+    * Detecta si la respuesta de RUS indica que el token es inválido o expirado.
+*/
+function esRespuestaNoAutorizada(data: unknown): boolean {
+
+    if (!data || typeof data !== "object") {
+        return false;
+    }
+
+    const respuesta = data as {
+        status?: number;
+        error?: string;
+    };
+
+    return (
+        respuesta.status === 401 ||
+        respuesta.error?.toLowerCase() === "unauthorized"
+    );
 }
 
 export async function obtenerDetallePropuesta(

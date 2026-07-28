@@ -1,204 +1,183 @@
-import { RiesgoRUS } from "../src/companias/rus/models/riesgoRus";
-import { TipoRiesgo } from "../src/models/TipoRiesgo";
-import { obtenerProductoresRUS } from "../src/companias/rus/productoresRUS";
-import { RusCarteraService } from "../src/companias/rus/services/rusCarteraService";
+import "dotenv/config";
 
-import { guardarJson } from "../src/utils/jsonUtils";
-import { calcularDiasRestantes } from "../src/utils/utils";
+import { Productor } from "../src/models/productor";
+import { RusSyncService } from "../src/companias/rus/services/rusSyncService";
+import { FirestorePolizaRepository } from "../src/repositories/firestorePolizaRepository";
+import { ECompania } from "../src/models/eCompania";
 
-const ARCHIVO_SALIDA = "rus-riesgos.json";
+const productor: Productor = {
+    codigo: 8381,
+    nombre: "Tecnica y servicios",
+    estado_id: 0
+};
+
+/**
+ * Primero sin escribir en Firestore.
+ */
+const ESCRIBIR_FIRESTORE = true;
+
+/**
+ * Rango utilizado para reconstruir la cartera.
+ *
+ * Debe cubrir todas las pólizas que todavía podrían estar vigentes.
+ * Para la prueba inicial usamos el último año.
+ */
+const FECHA_DESDE = "2025-07-27";
+const FECHA_HASTA = "2026-07-27";
 
 async function main(): Promise<void> {
+
+    const inicio = Date.now();
+
+    console.log("");
+    console.log("==================================================");
+    console.log("PRUEBA DE SINCRONIZACIÓN RUS");
+    console.log("==================================================");
+    console.log(`Productor: ${productor.codigo} - ${productor.nombre}`);
+    console.log(`Fecha desde: ${FECHA_DESDE}`);
+    console.log(`Fecha hasta: ${FECHA_HASTA}`);
+    console.log(`Escribir Firestore: ${ESCRIBIR_FIRESTORE}`);
+    console.log("==================================================");
+    console.log("");
+
     try {
-        const PREMIO_ALTO = 7_000_000;
 
-        const productores = obtenerProductoresRUS();
+        const rusSyncService = new RusSyncService();
 
-        const carteraService = new RusCarteraService();
+        console.log("Reconstruyendo cartera de RUS...");
 
-        const resultadoFinal: RiesgoRUS[] = [];
+        const resultado = await rusSyncService.sincronizar(productor,FECHA_DESDE, FECHA_HASTA);
 
         console.log("");
-        console.log("========================================");
-        console.log("RIESGOS RELEVANTES RUS");
-        console.log("========================================");
-        console.log("");
+        console.log("==================================================");
+        console.log("RESULTADO");
+        console.log("==================================================");
 
-        for (const productor of productores) {
+        console.log({
+            propuestasConsultadas:resultado.propuestasConsultadas,
+            propuestasVigentes:resultado.propuestasVigentes,
+            riesgosDetectados:resultado.riesgosDetectados
+        });
+
+        console.log("");
+        console.log("==================================================");
+        console.log("RIESGOS DETECTADOS");
+        console.log("==================================================");
+
+        if (resultado.polizas.length === 0) {
+
+            console.log("No se detectaron pólizas riesgosas.");
+
+        } else {
+
+            console.table(resultado.polizas.map(
+                    poliza => ({
+                        id: poliza.id,
+                        productor: poliza.productor.codigo,
+                        cliente: poliza.cliente.nombre,
+                        poliza: poliza.detallePoliza.numeroPoliza,
+                        endoso: poliza.detallePoliza.endoso,
+                        cobertura: poliza.riesgo.cobertura,
+                        premio: poliza.riesgo.premio,
+                        riesgos: poliza.riesgos.join(", "),
+                        vigenciaDesde: formatearFecha(poliza.vigencia.desde),
+                        vigenciaHasta: formatearFecha(poliza.vigencia.hasta ),
+                        diasParaVencer: poliza.vigencia.diasParaVencer
+                    })
+                )
+            );
+
             console.log("");
-            console.log("========================================");
-            console.log(`${productor.nombre} (${productor.codigo})`);
-            console.log("========================================");
-
-            try {
-                const cartera =
-                    await carteraService.obtenerUltimoAnio(
-                        productor.codigo
-                    );
-
-                console.log(
-                    `Propuestas encontradas: ${cartera.getCantidad()}`
-                );
-
-                const riesgosDetectados: RiesgoRUS[] = [];
-
-                for (const propuesta of cartera.getPropuestas()) {
-                    try {
-                        const emitida =
-                            propuesta.estadoPoliza.trim() === "EMITIDA";
-
-                        const vigente =
-                            propuesta.vigenciaEstado.trim() === "VIGENTE";
-
-                        if (!emitida || !vigente) {
-                            continue;
-                        }
-
-                        const esFlota =
-                            cartera.esFlota(propuesta);
-
-                        const esPremioAlto =
-                            propuesta.premio >= PREMIO_ALTO;
-
-                        if (!esFlota && !esPremioAlto) {
-                            continue;
-                        }
-
-                        const tipo =
-                            esFlota
-                                ? TipoRiesgo.FLOTA
-                                : TipoRiesgo.PREMIO_ALTO;
-
-                        const fechaRefacturacion =
-                            propuesta.finPeriodoFacturacion ??
-                            propuesta.finVigencia;
-
-                        riesgosDetectados.push({
-                            codigoProductor:
-                                productor.codigo,
-
-                            nombreProductor:
-                                productor.nombre,
-
-                            poliza:
-                                propuesta.numeroPoliza,
-
-                            asegurado:
-                                propuesta.razonSocial.trim(),
-
-                            patente:
-                                propuesta.patente,
-
-                            interesAsegurable:
-                                propuesta.interesAsegurable,
-
-                            cantidadVehiculos:
-                                propuesta.cantidadVehiculos,
-
-                            premio:
-                                propuesta.premio,
-
-                            cobertura:
-                                propuesta.cobertura.trim(),
-
-                            inicioVigencia:
-                                propuesta.inicioVigencia,
-
-                            finVigencia:
-                                propuesta.finVigencia,
-
-                            finPeriodoFacturacion:
-                                fechaRefacturacion,
-
-                            diasParaRefacturar:
-                                calcularDiasRestantes(
-                                    fechaRefacturacion
-                                ),
-
-                            tipo,
-
-                            estadoPoliza:
-                                propuesta.estadoPoliza.trim(),
-
-                            vigenciaEstado:
-                                propuesta.vigenciaEstado.trim(),
-
-                            seccion:
-                                propuesta.seccion,
-
-                            numeroSeccion:
-                                propuesta.numeroSeccion
-                        });
-
-                    } catch (error: any) {
-                        console.error(
-                            `Error analizando propuesta ${propuesta.propuesta}`
-                        );
-
-                        console.error(error?.message);
-                    }
-                }
-
-                console.log("");
-                console.log(
-                    `Riesgos detectados: ${riesgosDetectados.length}`
-                );
-
-                resultadoFinal.push(...riesgosDetectados);
-
-            } catch (error: any) {
-                console.error(
-                    `Error procesando productor ${productor.codigo}`
-                );
-
-                console.error(error?.message);
-            }
+            console.log("DOCUMENTOS COMPLETOS");
+            console.log(JSON.stringify(resultado.polizas,reemplazarFechas,2));
         }
 
-        console.log("");
-        console.log("========================================");
-        console.log("RESUMEN GENERAL");
-        console.log("========================================");
+        if (!ESCRIBIR_FIRESTORE) {
 
-        console.log(
-            `Total oportunidades: ${resultadoFinal.length}`
-        );
+            console.log("");
+            console.log("==================================================");
+            console.log("MODO DIAGNÓSTICO");
+            console.log("==================================================");
+            console.log("No se realizaron escrituras en Firestore.");
 
-        console.log(
-            `Flotas: ${
-                resultadoFinal.filter(
-                    riesgo => riesgo.tipo === TipoRiesgo.FLOTA
-                ).length
-            }`
-        );
+            return;
+        }
 
-        console.log(
-            `Premios altos: ${
-                resultadoFinal.filter(
-                    riesgo => riesgo.tipo === TipoRiesgo.PREMIO_ALTO
-                ).length
-            }`
-        );
-
-        resultadoFinal.sort(
-            (a, b) =>
-                a.diasParaRefacturar -
-                b.diasParaRefacturar
-        );
+        /*
+         * La escritura en Firestore se agrega
+         * después de validar correctamente el resultado.
+         */
+        const polizaRepository = new FirestorePolizaRepository();
 
         console.log("");
-        console.log("Exportando JSON...");
+        console.log("==================================================");
+        console.log("SINCRONIZANDO FIRESTORE");
+        console.log("==================================================");
 
-        guardarJson(
-            resultadoFinal,
-            ARCHIVO_SALIDA
-        );
+        const resultadoFirestore = await polizaRepository.sincronizarRiesgosProductor(productor, ECompania.RIO_URUGUAY,resultado.polizas);
 
-    } catch (error) {
-        console.error("ERROR ANALIZANDO CARTERA RUS:");
+        console.log("Sincronización Firestore finalizada.");
+        console.log(resultadoFirestore);
 
-        console.error(error);
+    } catch (error: any) {
+
+        console.error("");
+        console.error("==================================================");
+        console.error("ERROR EN SINCRONIZACIÓN RUS");
+        console.error("==================================================");
+
+        console.error({
+            productor: productor.codigo,
+            nombre: productor.nombre,
+            mensaje: error?.message ?? "Error desconocido",
+            status: error?.response?.status,
+            detalle: error?.response?.data
+        });
+
+        process.exitCode = 1;
+
+    } finally {
+
+        const duracionMs = Date.now() - inicio;
+
+        console.log("");
+        console.log(`Duración: ${formatearDuracion(duracionMs)}`);
     }
+}
+
+function formatearFecha(fecha: Date | string | undefined): string {
+
+    if (!fecha) {
+        return "";
+    }
+
+    const fechaNormalizada = fecha instanceof Date ? fecha : new Date(fecha);
+
+    if (Number.isNaN(fechaNormalizada.getTime())) {
+        return String(fecha);
+    }
+
+    return fechaNormalizada.toISOString().substring(0, 10);
+}
+
+function reemplazarFechas(_clave: string,valor: unknown): unknown {
+
+    if (valor instanceof Date) {
+        return valor.toISOString();
+    }
+
+    return valor;
+}
+
+function formatearDuracion(duracionMs: number): string {
+
+    const segundosTotales = Math.floor(duracionMs / 1000);
+
+    const minutos = Math.floor(segundosTotales / 60);
+
+    const segundos = segundosTotales % 60;
+
+    return `${minutos}m ${segundos}s`;
 }
 
 main();

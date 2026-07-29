@@ -74,4 +74,12 @@ export class DateUtils {
         return TipoVigencia.OTRA;
     }
 
+
+    
+
+    
+
+
+
+
 }

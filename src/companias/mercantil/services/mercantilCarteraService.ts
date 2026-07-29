@@ -25,9 +25,7 @@ export class MercantilCarteraService {
 
     private readonly pageSize: number;
 
-    constructor(
-        pageSize: number = 100
-    ) {
+    constructor(pageSize: number = 100) {
         this.pageSize = pageSize;
     }
 
@@ -89,6 +87,9 @@ private esErrorSql0305(error: unknown): boolean {
 
     return data?.errores?.some(item => item.id === "SQL0305") ?? false;
 }
+
+
+
     async obtenerDetallePoliza(poliza: number, endoso: number): Promise<MercantilDetallePolizaManager> {
     
         const detalle = await obtenerDetallePoliza(poliza,endoso);

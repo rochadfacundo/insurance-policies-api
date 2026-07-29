@@ -4,180 +4,304 @@ import { Productor } from "../src/models/productor";
 import { RusSyncService } from "../src/companias/rus/services/rusSyncService";
 import { FirestorePolizaRepository } from "../src/repositories/firestorePolizaRepository";
 import { ECompania } from "../src/models/eCompania";
+import { obtenerProductoresRUS0 } from "../src/companias/rus/productoresRUS";
+import { ModoSincronizacionRus } from "../src/companias/rus/models/modoSincronizacionRus";
+import { formatearDuracion, formatearFecha, restarDias } from "../src/utils/utils";
+import { ErrorProductor } from "../src/models/errorProductor";
+import { FirestoreRusSyncStateRepository } from "../src/companias/rus/repositories/firestoreRusSyncStateRepository";
+import { EstadoSincronizacionRus, RusSyncState } from "../src/companias/rus/models/rusSyncState";
 
-const productor: Productor = {
-    codigo: 8381,
-    nombre: "Tecnica y servicios",
-    estado_id: 0
-};
 
 /**
- * Primero sin escribir en Firestore.
+ * Rango de productores a procesar.
+ *
+ * slice(desde, hasta)
+ *
+ * Lote 1 -> 0,5
+ * Lote 2 -> 5,10
+ * Lote 3 -> 10,15
+ */
+const INDICE_DESDE = 10;
+const INDICE_HASTA = 15;
+
+/**
+ * Habilita o deshabilita la reconciliación en Firestore.
  */
 const ESCRIBIR_FIRESTORE = true;
 
 /**
  * Rango utilizado para reconstruir la cartera.
- *
  * Debe cubrir todas las pólizas que todavía podrían estar vigentes.
- * Para la prueba inicial usamos el último año.
  */
-const FECHA_DESDE = "2025-07-27";
-const FECHA_HASTA = "2026-07-27";
+const FECHA_DESDE = "2025-07-29";
+const FECHA_HASTA = "2026-07-29";
+
 
 async function main(): Promise<void> {
 
-    const inicio = Date.now();
+    const inicioGeneral = Date.now();
+
+    const productores: Productor[] = obtenerProductoresRUS0().slice(INDICE_DESDE, INDICE_HASTA)
+        .map(productor => ({
+            codigo: productor.codigo,
+            nombre: productor.nombre.trim(),
+            estado_id: productor.estado_id }));
+
+    if (productores.length === 0) {
+        console.log("No se encontraron productores activos para procesar.");
+        return;
+    }
+
+    const rusSyncService = new RusSyncService();
+    const polizaRepository = new FirestorePolizaRepository();
+    const rusSyncStateRepository = new FirestoreRusSyncStateRepository();
+
+
+
+    const errores: ErrorProductor[] = [];
+
+    let productoresExitosos = 0;
+    let productoresConError = 0;
+
+    let totalPropuestasConsultadas = 0;
+    let totalPropuestasVigentes = 0;
+    let totalRiesgosDetectados = 0;
+
+    let totalRiesgosActuales = 0;
+    let totalRiesgosNuevos = 0;
+    let totalRiesgosActualizados = 0;
+    let totalRiesgosEliminados = 0;
 
     console.log("");
     console.log("==================================================");
-    console.log("PRUEBA DE SINCRONIZACIÓN RUS");
+    console.log("SINCRONIZACIÓN DE CARTERA RUS");
     console.log("==================================================");
-    console.log(`Productor: ${productor.codigo} - ${productor.nombre}`);
+    console.log(`Productores seleccionados: ${productores.length}`);
     console.log(`Fecha desde: ${FECHA_DESDE}`);
     console.log(`Fecha hasta: ${FECHA_HASTA}`);
     console.log(`Escribir Firestore: ${ESCRIBIR_FIRESTORE}`);
     console.log("==================================================");
-    console.log("");
 
-    try {
+    for (let indice = 0;  indice < productores.length; indice++) {
 
-        const rusSyncService = new RusSyncService();
+        const productor = productores[indice];
 
-        console.log("Reconstruyendo cartera de RUS...");
+        const inicioProductor = Date.now();
 
-        const resultado = await rusSyncService.sincronizar(productor,FECHA_DESDE, FECHA_HASTA);
+        if(productor === undefined || productor.codigo === undefined || productor.nombre === undefined) {
+            continue;
+        }
 
         console.log("");
-        console.log("==================================================");
-        console.log("RESULTADO");
-        console.log("==================================================");
+        console.log("--------------------------------------------------");
+        console.log(`[${indice + 1}/${productores.length}] ` + `${productor.codigo} - ${productor.nombre}`);
+        console.log("--------------------------------------------------");
+
+        const ahora = new Date();
+
+        const estadoAnterior =await rusSyncStateRepository.obtenerPorProductor(productor.codigo);
+
+        let modoActual = ModoSincronizacionRus.BOOTSTRAP;
+        let fechaDesdeActual = FECHA_DESDE;
+        const fechaHastaActual = FECHA_HASTA;
+
+        if (estadoAnterior?.bootstrapCompleto === true && estadoAnterior.ultimaFechaProcesada) {
+           
+            modoActual = ModoSincronizacionRus.INCREMENTAL;
+
+            fechaDesdeActual = restarDias(estadoAnterior.ultimaFechaProcesada,2);
+        }
+
+        console.log("Configuración seleccionada:");
 
         console.log({
-            propuestasConsultadas:resultado.propuestasConsultadas,
-            propuestasVigentes:resultado.propuestasVigentes,
-            riesgosDetectados:resultado.riesgosDetectados
+            modo: modoActual,
+            fechaDesde: fechaDesdeActual,
+            fechaHasta: fechaHastaActual
         });
 
-        console.log("");
-        console.log("==================================================");
-        console.log("RIESGOS DETECTADOS");
-        console.log("==================================================");
+        if (estadoAnterior) {
+            console.log("Estado anterior encontrado:");
 
-        if (resultado.polizas.length === 0) {
-
-            console.log("No se detectaron pólizas riesgosas.");
-
+            console.log({
+                estado: estadoAnterior.estado,
+                modo: estadoAnterior.modo,
+                bootstrapCompleto: estadoAnterior.bootstrapCompleto,
+                fechaDesde: estadoAnterior.fechaDesde,
+                fechaHasta: estadoAnterior.fechaHasta,
+                ultimaFechaProcesada: estadoAnterior.ultimaFechaProcesada
+            });
         } else {
-
-            console.table(resultado.polizas.map(
-                    poliza => ({
-                        id: poliza.id,
-                        productor: poliza.productor.codigo,
-                        cliente: poliza.cliente.nombre,
-                        poliza: poliza.detallePoliza.numeroPoliza,
-                        endoso: poliza.detallePoliza.endoso,
-                        cobertura: poliza.riesgo.cobertura,
-                        premio: poliza.riesgo.premio,
-                        riesgos: poliza.riesgos.join(", "),
-                        vigenciaDesde: formatearFecha(poliza.vigencia.desde),
-                        vigenciaHasta: formatearFecha(poliza.vigencia.hasta ),
-                        diasParaVencer: poliza.vigencia.diasParaVencer
-                    })
-                )
-            );
-
-            console.log("");
-            console.log("DOCUMENTOS COMPLETOS");
-            console.log(JSON.stringify(resultado.polizas,reemplazarFechas,2));
+            console.log("No existe una sincronización previa para este productor.");
         }
 
-        if (!ESCRIBIR_FIRESTORE) {
+        const estadoSincronizacion: RusSyncState = {
+            id: rusSyncStateRepository.construirId(productor.codigo),
+
+            productor: {
+                codigo: productor.codigo,
+                nombre: productor.nombre
+            },
+            modo: modoActual,
+            estado: EstadoSincronizacionRus.EN_PROCESO,
+            bootstrapCompleto: estadoAnterior?.bootstrapCompleto ?? false,
+            fechaDesde: fechaDesdeActual,
+            fechaHasta: fechaHastaActual,
+            ultimaFechaProcesada: estadoAnterior?.ultimaFechaProcesada ?? null,
+            fechaInicio: ahora,
+            fechaActualizacion: ahora
+        };
+
+        try {
+
+            if (ESCRIBIR_FIRESTORE) {
+                await rusSyncStateRepository.marcarEnProceso(estadoSincronizacion);
+            }
+
+            console.log("Reconstruyendo cartera de RUS...");
+
+            const resultado = await rusSyncService.sincronizar(productor, fechaDesdeActual, fechaHastaActual, modoActual);
+
+
+
+            totalPropuestasConsultadas += resultado.propuestasConsultadas;
+            totalPropuestasVigentes += resultado.propuestasVigentes;
+            totalRiesgosDetectados += resultado.riesgosDetectados;
 
             console.log("");
-            console.log("==================================================");
-            console.log("MODO DIAGNÓSTICO");
-            console.log("==================================================");
-            console.log("No se realizaron escrituras en Firestore.");
+            console.log("RESULTADO DEL PRODUCTOR");
 
-            return;
+            console.log({
+                propuestasConsultadas:resultado.propuestasConsultadas,
+                propuestasVigentes:resultado.propuestasVigentes,
+                riesgosDetectados:resultado.riesgosDetectados
+            });
+
+            if (resultado.polizas.length === 0) {
+                console.log("No se detectaron pólizas riesgosas.");
+            } else {
+
+                console.log("");
+                console.log("RIESGOS DETECTADOS");
+
+                console.table(resultado.polizas.map(poliza => ({
+                            id: poliza.id,
+                            productor:poliza.productor.codigo,
+                            cliente:poliza.cliente.nombre.trim(),
+                            poliza:poliza.detallePoliza.numeroPoliza,
+                            endoso:poliza.detallePoliza.endoso,
+                            cobertura:poliza.riesgo.cobertura,
+                            premio:poliza.riesgo.premio,
+                            riesgos:poliza.riesgos.join(", "),
+                            vigenciaDesde:formatearFecha(poliza.vigencia.desde),
+                            vigenciaHasta:formatearFecha(poliza.vigencia.hasta),
+                            diasParaVencer: poliza.vigencia.diasParaVencer
+                        })
+                    )
+                );
+            }
+
+            if (!ESCRIBIR_FIRESTORE) {
+                console.log("Modo diagnóstico: no se realizaron " +"escrituras en Firestore.");
+                productoresExitosos++;
+                continue;
+            }
+
+            console.log("");
+            console.log("Sincronizando Firestore...");
+
+            const resultFirestore = modoActual === ModoSincronizacionRus.BOOTSTRAP
+                ? await polizaRepository.sincronizarRiesgosProductor(productor, ECompania.RIO_URUGUAY, resultado.polizas)
+                : await polizaRepository.sincronizarRiesgosIncrementales(resultado.polizas);
+
+            totalRiesgosActuales += resultFirestore.riesgosActuales;
+            totalRiesgosNuevos += resultFirestore.riesgosNuevos;
+            totalRiesgosActualizados += resultFirestore.riesgosActualizados;
+            totalRiesgosEliminados += resultFirestore.riesgosEliminados;
+
+            console.log("Sincronización Firestore finalizada.");
+
+            console.log(resultFirestore);
+            
+            await rusSyncStateRepository.marcarCompletado(estadoSincronizacion);
+            
+            console.log("Estado de sincronización marcado como COMPLETADO.");
+            productoresExitosos++;
+
+        } catch (error: any) {
+
+            productoresConError++;
+
+            const errorProductor: ErrorProductor = {
+                codigo: productor.codigo,
+                nombre: productor.nombre,
+                mensaje:error?.message ?? "Error desconocido",
+                status:error?.response?.status,
+                detalle:error?.response?.data
+            };
+
+            if (ESCRIBIR_FIRESTORE) {
+                await rusSyncStateRepository.marcarError(estadoSincronizacion, errorProductor.mensaje);
+            }
+
+            errores.push(errorProductor);
+
+            console.error("");
+            console.error("ERROR EN SINCRONIZACIÓN DEL PRODUCTOR");
+
+            console.error(errorProductor);
+
+        } finally {
+
+            const duracionProductor = Date.now() - inicioProductor;
+            console.log(`Duración productor: ` + `${formatearDuracion(duracionProductor)}`);
         }
+    }
 
-        /*
-         * La escritura en Firestore se agrega
-         * después de validar correctamente el resultado.
-         */
-        const polizaRepository = new FirestorePolizaRepository();
+    const duracionGeneral = Date.now() - inicioGeneral;
+
+    console.log("");
+    console.log("==================================================");
+    console.log("RESUMEN GENERAL");
+    console.log("==================================================");
+
+    console.log({
+        productoresTotales: productores.length,
+        productoresExitosos,
+        productoresConError,
+        totalPropuestasConsultadas,
+        totalPropuestasVigentes,
+        totalRiesgosDetectados,
+        totalRiesgosActuales,
+        totalRiesgosNuevos,
+        totalRiesgosActualizados,
+        totalRiesgosEliminados,
+        duracionTotal: formatearDuracion(duracionGeneral)
+    });
+
+    if (errores.length > 0) {
 
         console.log("");
         console.log("==================================================");
-        console.log("SINCRONIZANDO FIRESTORE");
+        console.log("PRODUCTORES CON ERROR");
         console.log("==================================================");
 
-        const resultadoFirestore = await polizaRepository.sincronizarRiesgosProductor(productor, ECompania.RIO_URUGUAY,resultado.polizas);
-
-        console.log("Sincronización Firestore finalizada.");
-        console.log(resultadoFirestore);
-
-    } catch (error: any) {
-
-        console.error("");
-        console.error("==================================================");
-        console.error("ERROR EN SINCRONIZACIÓN RUS");
-        console.error("==================================================");
-
-        console.error({
-            productor: productor.codigo,
-            nombre: productor.nombre,
-            mensaje: error?.message ?? "Error desconocido",
-            status: error?.response?.status,
-            detalle: error?.response?.data
-        });
+        console.table(errores.map(error => ({
+                codigo: error.codigo,
+                nombre: error.nombre,
+                status: error.status ?? "sin status",
+                mensaje: error.mensaje })));
 
         process.exitCode = 1;
-
-    } finally {
-
-        const duracionMs = Date.now() - inicio;
-
-        console.log("");
-        console.log(`Duración: ${formatearDuracion(duracionMs)}`);
     }
 }
 
-function formatearFecha(fecha: Date | string | undefined): string {
 
-    if (!fecha) {
-        return "";
-    }
+main().catch(error => {
+    
+    console.error("");
+    console.error("ERROR GENERAL DEL PROCESO");
+    console.error(error);
 
-    const fechaNormalizada = fecha instanceof Date ? fecha : new Date(fecha);
-
-    if (Number.isNaN(fechaNormalizada.getTime())) {
-        return String(fecha);
-    }
-
-    return fechaNormalizada.toISOString().substring(0, 10);
-}
-
-function reemplazarFechas(_clave: string,valor: unknown): unknown {
-
-    if (valor instanceof Date) {
-        return valor.toISOString();
-    }
-
-    return valor;
-}
-
-function formatearDuracion(duracionMs: number): string {
-
-    const segundosTotales = Math.floor(duracionMs / 1000);
-
-    const minutos = Math.floor(segundosTotales / 60);
-
-    const segundos = segundosTotales % 60;
-
-    return `${minutos}m ${segundos}s`;
-}
-
-main();
+    process.exitCode = 1;
+});

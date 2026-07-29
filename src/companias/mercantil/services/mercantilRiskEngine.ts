@@ -34,19 +34,19 @@ export class MercantilRiskEngine {
         return Array.from(riesgos);
     }
 
-        /**
+    /**
      * Una póliza se considera flota solamente cuando:
      * - pertenece a la rama Automotores;
      * - posee más de un bien asegurado.
      */
-        private static esFlota(detalle: MercantilDetallePolizaManager,bienes: MercantilBienesPolizaManager): boolean {
+    private static esFlota(detalle: MercantilDetallePolizaManager,bienes: MercantilBienesPolizaManager): boolean {
     
-            const esAutomotor = detalle.getRamaId() === this.RAMA_AUTOMOTORES;
+        const esAutomotor = detalle.getRamaId() === this.RAMA_AUTOMOTORES;
     
-            const tieneMultiplesBienes = bienes.getCantidadBienes() > 1;
+        const tieneMultiplesBienes = bienes.getCantidadBienes() > 1;
     
-            return esAutomotor && tieneMultiplesBienes;
-        }
+        return esAutomotor && tieneMultiplesBienes;
+    }
     
 
     /**

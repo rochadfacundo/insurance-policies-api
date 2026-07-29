@@ -7,6 +7,11 @@ import {
     RusPropuestasResponse
 } from "../models/rusPropuestasInterfaces";
 
+/*
+    * Obtiene las propuestas de un productor desde RUS.
+    *
+    * Si el token almacenado es rechazado, solicita uno nuevo y reintenta.
+*/
 export async function obtenerPropuestas(body: RusPropuestasRequest): Promise<RusPropuestasResponse> {
 
     const config = getRusConfig();

@@ -1,6 +1,7 @@
 import { Poliza } from "../../../models/poliza";
 import { Productor } from "../../../models/productor";
 import { RusPolizaMapper } from "../mapper/rusPolizaMapper";
+import { ModoSincronizacionRus } from "../models/modoSincronizacionRus";
 import { RusPropuesta } from "../models/rusPropuestasInterfaces";
 import { RusCarteraService } from "./rusCarteraService";
 import { RusRiskEngine } from "./rusRiskEngine";
@@ -25,7 +26,14 @@ export class RusSyncService {
      *
      * Este método todavía no escribe en Firestore.
      */
-    async sincronizar(productor: Productor, fechaDesde: string,fechaHasta: string): Promise<ResultadoRusSync> {
+    async sincronizar(productor: Productor, fechaDesde: string,fechaHasta: string,modo: ModoSincronizacionRus): Promise<ResultadoRusSync> {
+
+        console.log("--------------------------------------------------");
+        console.log(`Productor: ${productor.codigo} - ${productor.nombre}`);
+        console.log(`Modo: ${modo}`);
+        console.log(`Desde: ${fechaDesde}`);
+        console.log(`Hasta: ${fechaHasta}`);
+        console.log("--------------------------------------------------");
 
         const manager = await this.carteraService.obtenerCarteraPorRango(productor.codigo,fechaDesde,fechaHasta);
 
@@ -34,22 +42,13 @@ export class RusSyncService {
         const propuestasVigentes = propuestasConsultadas.filter(propuesta => this.esPropuestaVigente(propuesta));
 
         //debug
-        const propuestasConPremioMayor =
-            [...propuestasVigentes]
-                .sort(
-                    (a, b) =>
-                        Number(b.premio ?? 0) -
-                        Number(a.premio ?? 0)
-                )
-                .slice(0, 10);
+        const propuestasConPremioMayor = [...propuestasVigentes]
+                .sort((a, b) => Number(b.premio ?? 0) - Number(a.premio ?? 0)).slice(0, 10);
 
-        const posiblesFlotas =
-            propuestasVigentes.filter(
-                propuesta =>
+        const posiblesFlotas = propuestasVigentes.filter(propuesta =>
                     propuesta.numeroSeccion === 4 ||
                     propuesta.esFlota === true ||
-                    Number(propuesta.cantidadVehiculos ?? 0) > 1
-            );
+                    Number(propuesta.cantidadVehiculos ?? 0) > 1);
 
         console.log("");
         console.log("==================================================");
@@ -57,55 +56,35 @@ export class RusSyncService {
         console.log("==================================================");
 
         console.log("Premio máximo:", {
-            premio:
-                propuestasConPremioMayor[0]?.premio ?? 0,
-            poliza:
-                propuestasConPremioMayor[0]?.numeroPoliza,
-            cliente:
-                propuestasConPremioMayor[0]?.nombrePersona ??
-                propuestasConPremioMayor[0]?.razonSocial
-        });
+            premio: propuestasConPremioMayor[0]?.premio ?? 0,
+            poliza: propuestasConPremioMayor[0]?.numeroPoliza,
+            cliente: propuestasConPremioMayor[0]?.nombrePersona ?? propuestasConPremioMayor[0]?.razonSocial});
 
         console.table(
             propuestasConPremioMayor.map(
                 propuesta => ({
-                    poliza:
-                        propuesta.numeroPoliza,
-                    cliente:
-                        propuesta.nombrePersona?.trim() ||
-                        propuesta.razonSocial?.trim(),
-                    seccion:
-                        propuesta.numeroSeccion,
-                    premio:
-                        propuesta.premio,
-                    esFlota:
-                        propuesta.esFlota,
-                    cantidadVehiculos:
-                        propuesta.cantidadVehiculos
+                    poliza: propuesta.numeroPoliza,
+                    cliente: propuesta.nombrePersona?.trim() || propuesta.razonSocial?.trim(),
+                    seccion: propuesta.numeroSeccion,
+                    premio: propuesta.premio,
+                    esFlota: propuesta.esFlota,
+                    cantidadVehiculos: propuesta.cantidadVehiculos
                 })
             )
         );
 
-        console.log(
-            `Posibles flotas encontradas: ${posiblesFlotas.length}`
-        );
+        console.log(`Posibles flotas encontradas: ${posiblesFlotas.length}`);
 
         if (posiblesFlotas.length > 0) {
             console.table(
                 posiblesFlotas.map(
                     propuesta => ({
-                        poliza:
-                            propuesta.numeroPoliza,
-                        seccion:
-                            propuesta.numeroSeccion,
-                        descripcionSeccion:
-                            propuesta.seccion,
-                        esFlota:
-                            propuesta.esFlota,
-                        cantidadVehiculos:
-                            propuesta.cantidadVehiculos,
-                        premio:
-                            propuesta.premio
+                        poliza: propuesta.numeroPoliza,
+                        seccion: propuesta.numeroSeccion,
+                        descripcionSeccion: propuesta.seccion,
+                        esFlota: propuesta.esFlota,
+                        cantidadVehiculos: propuesta.cantidadVehiculos,
+                        premio: propuesta.premio
                     })
                 )
             );
@@ -115,10 +94,7 @@ export class RusSyncService {
 
         const polizasRiesgosas: Poliza[] = [];
 
-        for (
-            const propuesta
-            of propuestasVigentes
-        ) {
+        for (const propuesta of propuestasVigentes) {
 
             const riesgos = RusRiskEngine.detectar(propuesta);
 
@@ -188,4 +164,5 @@ export class RusSyncService {
         }
         return Array.from(map.values());
     }
+    
 }

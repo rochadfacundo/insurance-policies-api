@@ -313,4 +313,98 @@ export class FirestorePolizaRepository {
     }
 
 
+    /**
+     *  Sincroniza los riesgos incrementales de un productor.
+     * @param polizas    
+     * @returns  
+     */
+    async sincronizarRiesgosIncrementales(polizas: Poliza[]): Promise<{
+        riesgosActuales: number;
+        riesgosNuevos: number;
+        riesgosActualizados: number;
+        riesgosEliminados: number;
+    }> {
+    
+        if (polizas.length === 0) {
+            return {
+                riesgosActuales: 0,
+                riesgosNuevos: 0,
+                riesgosActualizados: 0,
+                riesgosEliminados: 0
+            };
+        }
+    
+        const coleccion =
+            this.firestore.collection(this.COLLECTION_NAME);
+    
+        let riesgosNuevos = 0;
+        let riesgosActualizados = 0;
+    
+        for (
+            let indice = 0;
+            indice < polizas.length;
+            indice += this.BATCH_SIZE
+        ) {
+            const lote = polizas.slice(
+                indice,
+                indice + this.BATCH_SIZE
+            );
+    
+            const referencias = lote.map(poliza =>
+                coleccion.doc(poliza.id)
+            );
+    
+            const documentosExistentes =
+                await this.firestore.getAll(...referencias);
+    
+            const batch = this.firestore.batch();
+    
+            for (
+                let posicion = 0;
+                posicion < lote.length;
+                posicion++
+            ) {
+                const poliza = lote[posicion];
+                const referencia = referencias[posicion];
+                const documentoExistente =
+                    documentosExistentes[posicion];
+    
+                if (
+                    poliza === undefined ||
+                    referencia === undefined ||
+                    documentoExistente === undefined
+                ) {
+                    continue;
+                }
+    
+                if (documentoExistente.exists) {
+                    riesgosActualizados++;
+                } else {
+                    riesgosNuevos++;
+                }
+    
+                batch.set(
+                    referencia,
+                    {
+                        ...poliza,
+                        fechaActualizacion: new Date()
+                    },
+                    {
+                        merge: true
+                    }
+                );
+            }
+    
+            await batch.commit();
+        }
+    
+        return {
+            riesgosActuales: polizas.length,
+            riesgosNuevos,
+            riesgosActualizados,
+            riesgosEliminados: 0
+        };
+    }
+
+
 }

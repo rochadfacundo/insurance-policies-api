@@ -3,8 +3,6 @@ import fs from "fs";
 import path from "path";
 import { TokenData } from "../models/tokenData";
 
-
-
 const TOKENS_DIR = path.resolve(__dirname,"../tokens");
 
 function asegurarDirectorioTokens(): void {

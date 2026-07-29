@@ -1,4 +1,4 @@
-import { formatearFecha } from "../../../utils/utils";
+import { esperar, formatearFecha, generarRangoFechas, obtenerMensajeError } from "../../../utils/utils";
 import { RusPropuesta, RusPropuestasRequest, RusPropuestasResponse } from "../models/rusPropuestasInterfaces";
 import { RusPropuestasManager } from "../models/rusPropuestasManager";
 import { obtenerDetallePropuesta, obtenerPropuestas } from "./rusPropuestasService";
@@ -129,16 +129,9 @@ export class RusCarteraService {
     /**
      * Obtiene cartera para un productor dentro de un rango de fechas.
      */
-    async obtenerCarteraPorRango(
-        productor: number,
-        fechaDesde: string,
-        fechaHasta: string
-    ): Promise<RusPropuestasManager> {
+    async obtenerCarteraPorRango(productor: number, fechaDesde: string, fechaHasta: string): Promise<RusPropuestasManager> {
     
-        const fechas = this.generarRangoFechas(
-            fechaDesde,
-            fechaHasta
-        );
+        const fechas = generarRangoFechas(fechaDesde,fechaHasta);
     
         const propuestasAcumuladas: RusPropuesta[] = [];
 
@@ -268,27 +261,16 @@ private async obtenerPropuestasConReintento(
 
     let ultimoError: unknown;
 
-    for (
-        let intento = 1;
-        intento <= MAX_INTENTOS;
-        intento++
-    ) {
-
+    for (let intento = 1; intento <= MAX_INTENTOS; intento++) {
         try {
 
             const response = await obtenerPropuestas(request);
 
-            if (
-                response &&
-                response.paging &&
-                Array.isArray(response.results)
-            ) {
+            if (response && response.paging && Array.isArray(response.results)) {
                 return response;
             }
 
-            throw new Error(
-                `Respuesta inválida: ${JSON.stringify(response)}`
-            );
+            throw new Error(`Respuesta inválida: ${JSON.stringify(response)}`);
 
         } catch (error) {
 
@@ -298,9 +280,7 @@ private async obtenerPropuestasConReintento(
                 break;
             }
 
-            const demora =
-                demorasMs[intento - 1]
-                ?? 120_000;
+            const demora = demorasMs[intento - 1]   ?? 120_000;
 
             console.warn(
                 `RUS falló. ` +
@@ -309,10 +289,10 @@ private async obtenerPropuestasConReintento(
                 `Productor: ${productor}. ` +
                 `Fecha: ${fechaEmision}. ` +
                 `Página: ${pagina}. ` +
-                `Error: ${this.obtenerMensajeError(error)}`
+                `Error: ${obtenerMensajeError(error)}`
             );
 
-            await this.esperar(demora);
+            await esperar(demora);
         }
     }
 
@@ -321,41 +301,12 @@ private async obtenerPropuestasConReintento(
         `Productor: ${productor}. ` +
         `Fecha: ${fechaEmision}. ` +
         `Página: ${pagina}. ` +
-        `Error: ${this.obtenerMensajeError(ultimoError)}`
+        `Error: ${obtenerMensajeError(ultimoError)}`
     );
 }
 
-private esperar(
-    milisegundos: number
-): Promise<void> {
 
-    return new Promise(
-        resolve =>
-            setTimeout(
-                resolve,
-                milisegundos
-            )
-    );
-}
 
-private obtenerMensajeError(
-    error: unknown
-): string {
-
-    if (error instanceof Error) {
-        return error.message;
-    }
-
-    if (typeof error === "string") {
-        return error;
-    }
-
-    try {
-        return JSON.stringify(error);
-    } catch {
-        return String(error);
-    }
-}
     
     /**
      * Obtiene cartera de los últimos X meses.
@@ -384,23 +335,7 @@ private obtenerMensajeError(
         return await this.obtenerUltimosMeses(productor, 12);
     }
 
-    /**
-     * Genera un arreglo de fechas entre fechaDesde y fechaHasta.
-     */
-    private generarRangoFechas(fechaDesde: string,fechaHasta: string): string[] {
-
-        const fechas: string[] = [];
-
-        const actual = new Date(`${fechaDesde}T00:00:00`);
-        const hasta = new Date(`${fechaHasta}T00:00:00`);
-
-        while (actual <= hasta) {
-            fechas.push(formatearFecha(actual));
-            actual.setDate(actual.getDate() + 1);
-        }
-
-        return fechas;
-    }
+    
 
     /**
      * Elimina propuestas duplicadas.

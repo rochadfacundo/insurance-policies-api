@@ -1,4 +1,4 @@
-import { esperar, formatearFecha, generarRangoFechas, obtenerMensajeError } from "../../../utils/utils";
+import { esperar, formatearDuracion, formatearFecha, generarRangoFechas, obtenerMensajeError } from "../../../utils/utils";
 import { RusPropuesta, RusPropuestasRequest, RusPropuestasResponse } from "../models/rusPropuestasInterfaces";
 import { RusPropuestasManager } from "../models/rusPropuestasManager";
 import { obtenerDetallePropuesta, obtenerPropuestas } from "./rusPropuestasService";
@@ -131,15 +131,43 @@ export class RusCarteraService {
      */
     async obtenerCarteraPorRango(productor: number, fechaDesde: string, fechaHasta: string): Promise<RusPropuestasManager> {
     
+        //debug trazo
+        const inicioTotal = Date.now();
+
         const fechas = generarRangoFechas(fechaDesde,fechaHasta);
     
         const propuestasAcumuladas: RusPropuesta[] = [];
 
+
+        let fechasProcesadas = 0;
+        let fechasConResultados = 0;
+        let fechasSinResultados = 0;
+        let totalResultados = 0;
+
+        let duracionAcumuladaRequestsMs = 0;
+        let requestMasLentoMs = 0;
+        let fechaRequestMasLento: string | null = null;
+
+        /* vieja logica secuencial
         for (const fecha of fechas) {
+
+            //debug trazo1
+            const inicioRequest = Date.now();
     
             try {
     
                 const response = await this.obtenerPorFecha(productor,fecha);
+
+                //debug trazo2
+                const duracionRequest = Date.now() - inicioRequest;
+                duracionAcumuladaRequestsMs += duracionRequest;
+                fechasProcesadas++;
+
+                if (duracionRequest > requestMasLentoMs) {
+                    requestMasLentoMs = duracionRequest;
+                    fechaRequestMasLento = fecha;
+                }
+    
     
                     if (!Array.isArray(response?.results)) {
 
@@ -150,31 +178,175 @@ export class RusCarteraService {
                             `Respuesta: ${JSON.stringify(response)}`
                         );
                     }
+
+                const cantidadResultados = response.results.length;
+                totalResultados += cantidadResultados;
     
-                propuestasAcumuladas.push(
-                    ...response.results
-                );
+                if (cantidadResultados > 0) {
+                    fechasConResultados++;
+                    propuestasAcumuladas.push(...response.results);
+                } else {
+                    fechasSinResultados++;
+                }
+
+                    
+             // Evitamos imprimir las 365 fechas vacías.
+             // Solo mostramos fechas con resultados
+             // o requests particularmente lentos.
+             
+            if (cantidadResultados > 0 || duracionRequest >= 10_000) {
+                console.log({
+                    fecha,
+                    resultados: cantidadResultados,
+                    duracionMs: duracionRequest
+                });
+            }
     
             } catch (error: any) {
 
+                //debug trazo3
+                const duracionRequest = Date.now() - inicioRequest;
+
                 const status = error?.response?.status;
-            
                 const detalle = error?.response?.data;
+
+                //debug trazo3.5
+                console.error({
+                    productor,
+                    fecha,
+                    duracionMs: duracionRequest,
+                    status: status ?? "sin status",
+                    detalle: detalle ?? error?.message ?? "Error desconocido"
+                });
             
                 throw new Error(
                     `Error consultando RUS. ` +
                     `Productor: ${productor}. ` +
                     `Fecha: ${fecha}. ` +
                     `Status: ${status ?? "sin status"}. ` +
-                    `Detalle: ${detalle
-                            ? JSON.stringify(detalle)
-                            : error?.message
-                    }`
+                    `Detalle: ${detalle ? JSON.stringify(detalle) : error?.message}`
                 );
             }
+        }*/
+
+        // Nueva logica concurrente
+        const CONCURRENCIA_RUS = 3;
+
+        for (let indice = 0;indice < fechas.length;indice += CONCURRENCIA_RUS) {
+            const loteFechas = fechas.slice(indice,indice + CONCURRENCIA_RUS);
+
+            const resultadosLote = await Promise.all(loteFechas.map(async fecha => {
+
+                    const inicioRequest = Date.now();
+
+                    try {
+                        const response = await this.obtenerPorFecha(productor,fecha);
+
+                        const duracionRequest = Date.now() - inicioRequest;
+
+                        if (!Array.isArray(response?.results)) {
+                            throw new Error(`Respuesta inválida de RUS. ` +
+                                `Productor: ${productor}. ` +
+                                `Fecha: ${fecha}. ` +
+                                `Respuesta: ${JSON.stringify(response)}`
+                            );
+                        }
+
+                        return {
+                            fecha,
+                            resultados: response.results,
+                            duracionRequest
+                        };
+
+                    } catch (error: any) {
+                        const duracionRequest = Date.now() - inicioRequest;
+
+                        const status = error?.response?.status;
+
+                        const detalle = error?.response?.data;
+
+                        throw new Error(
+                            `Error consultando RUS. ` +
+                            `Productor: ${productor}. ` +
+                            `Fecha: ${fecha}. ` +
+                            `Duración: ${duracionRequest} ms. ` +
+                            `Status: ${status ?? "sin status"}. ` +
+                            `Detalle: ${detalle ? JSON.stringify(detalle) : error?.message}`);
+                    }
+                })
+            );
+
+            for (const resultado of resultadosLote) {
+                const {
+                    fecha,resultados,duracionRequest} = resultado;
+
+                duracionAcumuladaRequestsMs += duracionRequest;
+                fechasProcesadas++;
+
+                if (duracionRequest > requestMasLentoMs) {
+                    requestMasLentoMs = duracionRequest;
+                    fechaRequestMasLento = fecha;
+                }
+
+                const cantidadResultados = resultados.length;
+
+                totalResultados += cantidadResultados;
+
+                if (cantidadResultados > 0) {
+                    fechasConResultados++;
+
+                    propuestasAcumuladas.push(...resultados);
+                } else {
+                    fechasSinResultados++;
+                }
+
+                if (cantidadResultados > 0 || duracionRequest >= 10_000) {
+                    console.log({
+                        fecha,
+                        resultados: cantidadResultados,
+                        duracionMs: duracionRequest
+                    });
+                }
+            }
+
+            console.log(`Progreso RUS: ${Math.min(indice + CONCURRENCIA_RUS,fechas.length)}/${fechas.length} fechas`);
         }
+
+
+
+        //debug trazo4
+        const inicioDuplicados = Date.now();
     
         const propuestasSinDuplicados = this.eliminarDuplicados(propuestasAcumuladas);
+
+        //debug trazo5
+        const duracionEliminarDuplicados = Date.now() - inicioDuplicados;
+        const duracionTotal = Date.now() - inicioTotal;
+
+        const promedioRequestMs = fechasProcesadas > 0 ? Math.round(duracionAcumuladaRequestsMs /fechasProcesadas): 0;
+
+        console.log("");
+        console.log("==================================================");
+        console.log("MÉTRICAS RUS CARTERA");
+        console.log("==================================================");
+
+        console.log({
+            productor,
+            fechaDesde,
+            fechaHasta,
+            fechasTotales: fechas.length,
+            fechasProcesadas,
+            fechasConResultados,
+            fechasSinResultados,
+            totalResultados,
+            propuestasSinDuplicados: propuestasSinDuplicados.length,
+            promedioRequestMs,
+            requestMasLentoMs,
+            fechaRequestMasLento,
+            duracionAcumuladaRequestsMs: formatearDuracion(duracionAcumuladaRequestsMs),
+            duracionEliminarDuplicados: formatearDuracion(duracionEliminarDuplicados),
+            duracionTotal: formatearDuracion(duracionTotal)
+        });
     
         return this.crearManagerDesdePropuestas(propuestasSinDuplicados);
     }

@@ -4,7 +4,7 @@ import { Productor } from "../src/models/productor";
 import { RusSyncService } from "../src/companias/rus/services/rusSyncService";
 import { FirestorePolizaRepository } from "../src/repositories/firestorePolizaRepository";
 import { ECompania } from "../src/models/eCompania";
-import { obtenerProductoresRUS0 } from "../src/companias/rus/productoresRUS";
+import { obtenerProductoresRUS0, obtenerProductoresRUS1 } from "../src/companias/rus/productoresRUS";
 import { ModoSincronizacionRus } from "../src/companias/rus/models/modoSincronizacionRus";
 import { formatearDuracion, formatearFecha, restarDias } from "../src/utils/utils";
 import { ErrorProductor } from "../src/models/errorProductor";
@@ -21,8 +21,8 @@ import { EstadoSincronizacionRus, RusSyncState } from "../src/companias/rus/mode
  * Lote 2 -> 5,10
  * Lote 3 -> 10,15
  */
-const INDICE_DESDE = 10;
-const INDICE_HASTA = 15;
+const INDICE_DESDE = 2;
+const INDICE_HASTA = 3;
 
 /**
  * Habilita o deshabilita la reconciliación en Firestore.
@@ -41,7 +41,7 @@ async function main(): Promise<void> {
 
     const inicioGeneral = Date.now();
 
-    const productores: Productor[] = obtenerProductoresRUS0().slice(INDICE_DESDE, INDICE_HASTA)
+    const productores: Productor[] = obtenerProductoresRUS1().slice(INDICE_DESDE, INDICE_HASTA)
         .map(productor => ({
             codigo: productor.codigo,
             nombre: productor.nombre.trim(),

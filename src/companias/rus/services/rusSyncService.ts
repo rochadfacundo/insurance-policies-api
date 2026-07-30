@@ -1,5 +1,6 @@
 import { Poliza } from "../../../models/poliza";
 import { Productor } from "../../../models/productor";
+import { formatearDuracion } from "../../../utils/utils";
 import { RusPolizaMapper } from "../mapper/rusPolizaMapper";
 import { ModoSincronizacionRus } from "../models/modoSincronizacionRus";
 import { RusPropuesta } from "../models/rusPropuestasInterfaces";
@@ -28,6 +29,10 @@ export class RusSyncService {
      */
     async sincronizar(productor: Productor, fechaDesde: string,fechaHasta: string,modo: ModoSincronizacionRus): Promise<ResultadoRusSync> {
 
+
+        //debug trazo
+        const inicioSincronizacion = Date.now();
+
         console.log("--------------------------------------------------");
         console.log(`Productor: ${productor.codigo} - ${productor.nombre}`);
         console.log(`Modo: ${modo}`);
@@ -35,13 +40,40 @@ export class RusSyncService {
         console.log(`Hasta: ${fechaHasta}`);
         console.log("--------------------------------------------------");
 
+
+
+        //debug trazo
+        const inicioObtencionCartera = Date.now();
+
         const manager = await this.carteraService.obtenerCarteraPorRango(productor.codigo,fechaDesde,fechaHasta);
+
+        //debug trazo2
+        const duracionObtencionCartera = Date.now() - inicioObtencionCartera;
 
         const propuestasConsultadas = manager.getPropuestas();
 
+        //debug trazo3
+        console.log("");
+        console.log("MÉTRICAS DE OBTENCIÓN DE CARTERA");
+        console.log({
+            duracion: formatearDuracion(duracionObtencionCartera),
+            propuestasObtenidas: propuestasConsultadas.length
+        });
+
+        //debug trazo4
+        const inicioFiltradoVigentes = Date.now();
+
         const propuestasVigentes = propuestasConsultadas.filter(propuesta => this.esPropuestaVigente(propuesta));
 
-        //debug
+        //debug trazo5
+        const duracionFiltradoVigentes = Date.now() - inicioFiltradoVigentes;
+
+
+        //debug trazo6
+        const inicioDiagnostico = Date.now();
+
+
+        //debug premios
         const propuestasConPremioMayor = [...propuestasVigentes]
                 .sort((a, b) => Number(b.premio ?? 0) - Number(a.premio ?? 0)).slice(0, 10);
 
@@ -55,23 +87,26 @@ export class RusSyncService {
         console.log("DIAGNÓSTICO DE RIESGOS RUS");
         console.log("==================================================");
 
-        console.log("Premio máximo:", {
-            premio: propuestasConPremioMayor[0]?.premio ?? 0,
-            poliza: propuestasConPremioMayor[0]?.numeroPoliza,
-            cliente: propuestasConPremioMayor[0]?.nombrePersona ?? propuestasConPremioMayor[0]?.razonSocial});
 
-        console.table(
-            propuestasConPremioMayor.map(
-                propuesta => ({
+        //debug trazo6.5
+        if (propuestasVigentes.length === 0) {
+            console.log("No hay propuestas vigentes para diagnosticar.");
+        } else {
+            console.log("Premio máximo:", {
+                premio: propuestasConPremioMayor[0]?.premio ?? 0,
+                poliza: propuestasConPremioMayor[0]?.numeroPoliza,
+                cliente:propuestasConPremioMayor[0]?.nombrePersona?.trim() || propuestasConPremioMayor[0]?.razonSocial?.trim()
+            });
+        
+            console.table(propuestasConPremioMayor.map(propuesta => ({
                     poliza: propuesta.numeroPoliza,
                     cliente: propuesta.nombrePersona?.trim() || propuesta.razonSocial?.trim(),
                     seccion: propuesta.numeroSeccion,
                     premio: propuesta.premio,
                     esFlota: propuesta.esFlota,
                     cantidadVehiculos: propuesta.cantidadVehiculos
-                })
-            )
-        );
+            })));
+        }
 
         console.log(`Posibles flotas encontradas: ${posiblesFlotas.length}`);
 
@@ -92,6 +127,11 @@ export class RusSyncService {
 
         //fin debug
 
+
+        //debug trazo7
+        const duracionDiagnostico = Date.now() - inicioDiagnostico;
+        const inicioDeteccionRiesgos = Date.now();
+
         const polizasRiesgosas: Poliza[] = [];
 
         for (const propuesta of propuestasVigentes) {
@@ -107,7 +147,36 @@ export class RusSyncService {
             polizasRiesgosas.push(poliza);
         }
 
+        //debug trazo8
+        const duracionDeteccionRiesgos = Date.now() - inicioDeteccionRiesgos;
+        const inicioEliminacionDuplicados = Date.now();
+
         const polizasSinDuplicados = this.eliminarDuplicados(polizasRiesgosas);
+
+        //debug trazo9
+        const duracionEliminacionDuplicados =
+        Date.now() - inicioEliminacionDuplicados;
+        const duracionTotal = Date.now() - inicioSincronizacion;
+
+        //debug trazo10: print metrics
+        console.log("");
+        console.log("==================================================");
+        console.log("MÉTRICAS RUS SYNC");
+        console.log("==================================================");
+
+        console.log({
+            propuestasConsultadas: propuestasConsultadas.length,
+            propuestasVigentes: propuestasVigentes.length,
+            riesgosDetectados: polizasSinDuplicados.length,
+            obtencionCartera: formatearDuracion(duracionObtencionCartera),
+            filtradoVigentes: formatearDuracion(duracionFiltradoVigentes),
+            diagnostico: formatearDuracion(duracionDiagnostico),
+            deteccionRiesgos: formatearDuracion(duracionDeteccionRiesgos),
+            eliminacionDuplicados: formatearDuracion(
+                duracionEliminacionDuplicados
+            ),
+            duracionTotal: formatearDuracion(duracionTotal)
+        });
 
         return {
             propuestasConsultadas: propuestasConsultadas.length,

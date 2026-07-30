@@ -21,8 +21,8 @@ import { EstadoSincronizacionRus, RusSyncState } from "../src/companias/rus/mode
  * Lote 2 -> 5,10
  * Lote 3 -> 10,15
  */
-const INDICE_DESDE = 2;
-const INDICE_HASTA = 3;
+const INDICE_DESDE = 3;
+const INDICE_HASTA = 5;
 
 /**
  * Habilita o deshabilita la reconciliación en Firestore.

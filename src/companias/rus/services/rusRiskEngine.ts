@@ -23,12 +23,14 @@ export class RusRiskEngine {
         return riesgos;
     }
 
-    private static esFlota(propuesta: RusPropuesta): boolean {
+    private static readonly SECCIONES_VEHICULOS = [
+        4,   // Automotores
+        20   // Motovehículos
+    ];
 
-        return (
-            propuesta.numeroSeccion === this.SECCION_AUTOMOTORES &&
-            propuesta.esFlota === true &&
-            propuesta.cantidadVehiculos > 1 );
+    private static esFlota(propuesta: RusPropuesta): boolean {
+        
+        return (this.SECCIONES_VEHICULOS.includes(propuesta.numeroSeccion) &&propuesta.esFlota === true);
     }
 
     private static esPremioAlto(propuesta: RusPropuesta): boolean {

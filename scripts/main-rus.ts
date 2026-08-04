@@ -21,20 +21,26 @@ import { EstadoSincronizacionRus, RusSyncState } from "../src/companias/rus/mode
  * Lote 2 -> 5,10
  * Lote 3 -> 10,15
  */
-const INDICE_DESDE = 3;
-const INDICE_HASTA = 5;
+const INDICE_DESDE = 0;
+const INDICE_HASTA = 15;    
 
 /**
  * Habilita o deshabilita la reconciliación en Firestore.
  */
 const ESCRIBIR_FIRESTORE = true;
 
+
+/**
+ * Habilita o deshabilita la reconstrucción completa de la cartera.
+ */
+const FORZAR_BOOTSTRAP = true;
+
 /**
  * Rango utilizado para reconstruir la cartera.
  * Debe cubrir todas las pólizas que todavía podrían estar vigentes.
  */
-const FECHA_DESDE = "2025-07-29";
-const FECHA_HASTA = "2026-07-29";
+const FECHA_DESDE = "2025-08-03";
+const FECHA_HASTA = "2026-08-03";
 
 
 async function main(): Promise<void> {
@@ -105,11 +111,11 @@ async function main(): Promise<void> {
         let fechaDesdeActual = FECHA_DESDE;
         const fechaHastaActual = FECHA_HASTA;
 
-        if (estadoAnterior?.bootstrapCompleto === true && estadoAnterior.ultimaFechaProcesada) {
-           
+        if (!FORZAR_BOOTSTRAP && estadoAnterior?.bootstrapCompleto === true && estadoAnterior.ultimaFechaProcesada) {
             modoActual = ModoSincronizacionRus.INCREMENTAL;
-
-            fechaDesdeActual = restarDias(estadoAnterior.ultimaFechaProcesada,2);
+        
+            fechaDesdeActual = restarDias(estadoAnterior.ultimaFechaProcesada,2
+            );
         }
 
         console.log("Configuración seleccionada:");

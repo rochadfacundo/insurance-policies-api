@@ -72,12 +72,9 @@ async function main(): Promise<void> {
      * Si estado_id no existe en tu modelo o los activos usan otro valor,
      * eliminá esa condición.
      */
-    const productores =
-        obtenerProductoresMercantil()
-            .filter(
-                productor =>
-                    productor.estado_id === 1
-            );
+    const productores = obtenerProductoresMercantil().filter(productor => productor.estado_id === 1);
+
+
 
     const erroresProductores: ErrorProductor[] = [];
 
@@ -96,23 +93,14 @@ async function main(): Promise<void> {
     console.log("==================================================");
     console.log(`Productores a procesar: ${productores.length}`);
     console.log("");
-    console.log(
-        "La sincronización recalculará los riesgos y limpiará " +
-        "los falsos positivos guardados en Firestore."
-    );
+    console.log("La sincronización recalculará los riesgos de cada productor, ");
     console.log("");
 
-    for (
-        let indice = 0;
-        indice < productores.length;
-        indice++
-    ) {
+    for (let indice = 0; indice < productores.length; indice++) {
 
-        const productor =
-            productores[indice];
+        const productor = productores[indice];
 
-        const inicioProductor =
-            Date.now();
+        const inicioProductor = Date.now();
 
         
         if(productor==null || productor==undefined){
@@ -129,9 +117,7 @@ async function main(): Promise<void> {
 
         try {
 
-            console.log(
-                "Obteniendo cartera y recalculando riesgos..."
-            );
+            console.log("Obteniendo cartera y recalculando riesgos...");
 
             /*
              * sincronizar() consulta:
@@ -144,14 +130,11 @@ async function main(): Promise<void> {
              *
              * Devuelve únicamente los riesgos actuales.
              */
-            const riesgosActuales =
-                await syncService.sincronizar(
-                    productor
-                );
+            const riesgosActuales = await syncService.sincronizar(productor);
 
-            console.log(
-                `Riesgos actuales detectados: ${riesgosActuales.length}`
-            );
+            console.log(`Riesgos actuales válidos: ${riesgosActuales.length}`);
+
+            const resultado = await polizaRepository.sincronizarRiesgosProductor(productor, ECompania.MERCANTIL_ANDINA, riesgosActuales);
 
             /*
              * Compara:
@@ -165,49 +148,27 @@ async function main(): Promise<void> {
              * - archiva los desaparecidos;
              * - elimina los desaparecidos de "polizas".
              */
-            const resultado =
-                await polizaRepository
-                    .sincronizarRiesgosProductor(
-                        productor,
-                        ECompania.MERCANTIL_ANDINA,
-                        riesgosActuales
-                    );
+            //const resultado = await polizaRepository.sincronizarRiesgosProductor(productor,ECompania.MERCANTIL_ANDINA,riesgosActuales);
 
             productoresExitosos++;
 
-            totalRiesgosActuales +=
-                resultado.riesgosActuales;
-
-            totalRiesgosNuevos +=
-                resultado.riesgosNuevos;
-
-            totalRiesgosActualizados +=
-                resultado.riesgosActualizados;
-
-            totalRiesgosEliminados +=
-                resultado.riesgosEliminados;
+            totalRiesgosActuales += resultado.riesgosActuales;
+            totalRiesgosNuevos += resultado.riesgosNuevos;
+            totalRiesgosActualizados += resultado.riesgosActualizados;
+            totalRiesgosEliminados += resultado.riesgosEliminados;
 
             console.log("");
             console.log("Resultado del productor:");
-            console.log(
-                `  Riesgos actuales: ${resultado.riesgosActuales}`
-            );
-            console.log(
-                `  Riesgos nuevos: ${resultado.riesgosNuevos}`
-            );
-            console.log(
-                `  Riesgos actualizados: ${resultado.riesgosActualizados}`
-            );
-            console.log(
-                `  Riesgos eliminados: ${resultado.riesgosEliminados}`
-            );
+            console.log(`  Riesgos actuales: ${resultado.riesgosActuales}`);
+            console.log(`  Riesgos nuevos: ${resultado.riesgosNuevos}`);
+            console.log(`  Riesgos actualizados: ${resultado.riesgosActualizados}`);
+            console.log(`  Riesgos eliminados: ${resultado.riesgosEliminados}`);
 
         } catch (error: unknown) {
 
             productoresConError++;
 
-            const errorNormalizado =
-                normalizarError(error);
+            const errorNormalizado = normalizarError(error);
 
             const errorProductor: ErrorProductor = {
                 codigo: productor.codigo,
@@ -215,134 +176,74 @@ async function main(): Promise<void> {
                 mensaje: errorNormalizado.mensaje
             };
 
-            if (
-                errorNormalizado.status !==
-                undefined
-            ) {
-                errorProductor.status =
-                    errorNormalizado.status;
+            if (errorNormalizado.status !== undefined) {
+                errorProductor.status = errorNormalizado.status;
             }
 
-            if (
-                errorNormalizado.detalle !==
-                undefined
-            ) {
-                errorProductor.detalle =
-                    errorNormalizado.detalle;
+            if (errorNormalizado.detalle !== undefined) {
+                errorProductor.detalle = errorNormalizado.detalle;
             }
 
-            erroresProductores.push(
-                errorProductor
-            );
+            erroresProductores.push(errorProductor);
 
             console.error("");
-            console.error(
-                `Error procesando productor ${productor.codigo}:`
-            );
-            console.error(
-                errorNormalizado.mensaje
-            );
+            console.error(`Error procesando productor ${productor.codigo}:`);
+            console.error(errorNormalizado.mensaje);
 
             try {
 
-                const errorFirestore:
-                    ErrorSincronizacion = {
+                const errorFirestore: ErrorSincronizacion = {
 
-                    compania:
-                        ECompania.MERCANTIL_ANDINA,
+                    compania: ECompania.MERCANTIL_ANDINA,
 
                     productor: {
                         codigo: productor.codigo,
                         nombre: productor.nombre
                     },
 
-                    servicio:
-                        "sincronizacion-general-riesgos",
+                    servicio: "sincronizacion-general-riesgos",
 
-                    mensaje:
-                        errorNormalizado.mensaje,
+                    mensaje: errorNormalizado.mensaje,
 
                 };
 
-                if (
-                    errorNormalizado.detalle !==
-                    undefined
-                ) {
+                if (errorNormalizado.detalle !== undefined) {
                     errorFirestore.detalle =
                         errorNormalizado.detalle;
                 }
 
-                await errorRepository.guardar(
-                    errorFirestore
-                );
+                await errorRepository.guardar(errorFirestore);
 
-                console.log(
-                    "Error guardado en Firestore."
-                );
+                console.log("Error guardado en Firestore.");
 
-            } catch (
-                errorGuardandoFirestore: unknown
-            ) {
+            } catch (errorGuardandoFirestore: unknown) {
 
-                console.error(
-                    "No se pudo guardar el error en Firestore:"
-                );
+                console.error("No se pudo guardar el error en Firestore:");
 
-                console.error(
-                    obtenerMensajeError(
-                        errorGuardandoFirestore
-                    )
-                );
+                console.error(obtenerMensajeError(errorGuardandoFirestore));
             }
 
         } finally {
 
             productoresProcesados++;
 
-            console.log(
-                `Tiempo productor: ${
-                    formatearDuracion(
-                        Date.now() -
-                        inicioProductor
-                    )
-                }`
-            );
+            console.log(`Tiempo productor: ${formatearDuracion(Date.now() - inicioProductor)}`);
         }
     }
 
     const resumen: ResumenGeneral = {
-        productoresTotales:
-            productores.length,
-
+        productoresTotales: productores.length,
         productoresProcesados,
-
         productoresExitosos,
-
         productoresConError,
-
-        riesgosActuales:
-            totalRiesgosActuales,
-
-        riesgosNuevos:
-            totalRiesgosNuevos,
-
-        riesgosActualizados:
-            totalRiesgosActualizados,
-
-        riesgosEliminados:
-            totalRiesgosEliminados,
-
-        duracionTotal:
-            formatearDuracion(
-                Date.now() -
-                inicioGeneral
-            )
+        riesgosActuales: totalRiesgosActuales,
+        riesgosNuevos: totalRiesgosNuevos,
+        riesgosActualizados: totalRiesgosActualizados,
+        riesgosEliminados: totalRiesgosEliminados,
+        duracionTotal: formatearDuracion(Date.now() - inicioGeneral)
     };
 
-    mostrarResumen(
-        resumen,
-        erroresProductores
-    );
+    mostrarResumen(resumen,erroresProductores);
 
     if (productoresConError > 0) {
         process.exitCode = 1;

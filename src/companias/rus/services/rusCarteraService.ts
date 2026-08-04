@@ -230,7 +230,7 @@ export class RusCarteraService {
         }*/
 
         // Nueva logica concurrente
-        const CONCURRENCIA_RUS = 3;
+        const CONCURRENCIA_RUS = 6;
 
         for (let indice = 0;indice < fechas.length;indice += CONCURRENCIA_RUS) {
             const loteFechas = fechas.slice(indice,indice + CONCURRENCIA_RUS);

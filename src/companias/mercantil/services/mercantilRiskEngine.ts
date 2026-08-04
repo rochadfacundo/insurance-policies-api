@@ -21,6 +21,10 @@ export class MercantilRiskEngine {
      */
     static detectar(poliza: Poliza, detalle: MercantilDetallePolizaManager, bienes: MercantilBienesPolizaManager): TipoRiesgo[] {
 
+        if (this.tienePrimaNegativa(poliza)) {
+            return [];
+        }
+
         const riesgos = new Set<TipoRiesgo>();
 
         if (this.esFlota(detalle, bienes)) {
@@ -32,6 +36,17 @@ export class MercantilRiskEngine {
         }
 
         return Array.from(riesgos);
+    }
+
+    /**
+     * Detecta pólizas cuya prima es negativa. 
+     * @param poliza póliza a analizar 
+     * @returns true si la prima es negativa, false en caso contrario
+     */
+    private static tienePrimaNegativa(poliza: Poliza): boolean {
+        const prima = poliza.riesgo.prima;
+    
+        return prima !== undefined && prima !== null && prima < 0;
     }
 
     /**

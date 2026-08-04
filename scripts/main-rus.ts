@@ -4,7 +4,7 @@ import { Productor } from "../src/models/productor";
 import { RusSyncService } from "../src/companias/rus/services/rusSyncService";
 import { FirestorePolizaRepository } from "../src/repositories/firestorePolizaRepository";
 import { ECompania } from "../src/models/eCompania";
-import { obtenerProductoresRUS0, obtenerProductoresRUS1 } from "../src/companias/rus/productoresRUS";
+import { obtenerProductoresRUS1 } from "../src/companias/rus/productoresRUS";
 import { ModoSincronizacionRus } from "../src/companias/rus/models/modoSincronizacionRus";
 import { formatearDuracion, formatearFecha, restarDias } from "../src/utils/utils";
 import { ErrorProductor } from "../src/models/errorProductor";
@@ -39,8 +39,8 @@ const FORZAR_BOOTSTRAP = true;
  * Rango utilizado para reconstruir la cartera.
  * Debe cubrir todas las pólizas que todavía podrían estar vigentes.
  */
-const FECHA_DESDE = "2025-08-03";
-const FECHA_HASTA = "2026-08-03";
+const FECHA_DESDE = "2025-08-04";
+const FECHA_HASTA = "2026-08-04";
 
 
 async function main(): Promise<void> {

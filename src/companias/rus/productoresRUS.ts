@@ -1,5 +1,5 @@
 import productores0 from "./data/productoresRus0.json";
-import productores1 from "./data/productoresRus1.json";
+import productores1 from "./data/productoresRus3.json";
 
 
 export interface ProductorRUS {

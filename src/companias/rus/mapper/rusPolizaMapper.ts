@@ -2,19 +2,33 @@ import { ECompania } from "../../../models/eCompania";
 import { Poliza } from "../../../models/poliza";
 import { Productor } from "../../../models/productor";
 import { TipoVigencia } from "../../../models/tipoVigencia";
+import { DateUtils } from "../../../utils/dateUtils";
 import { RusPropuesta } from "../models/rusPropuestasInterfaces";
 
 export class RusPolizaMapper {
 
+
+    /**
+     * Mapea una propuesta de RUS a una póliza del modelo general.
+     * Primero se parsean las fechas de vigencia y facturación, 
+     * luego se construye el objeto Poliza con los datos de la propuesta y del productor. 
+     * Finalmente, se retorna el objeto Poliza mapeado.
+     * @param propuesta es la propuesta de RUS a mapear. 
+     * @param productor es el productor asociado a la propuesta. 
+     * @param riesgos son los riesgos detectados para la propuesta. 
+     * @returns un objeto Poliza mapeado a partir de la propuesta, productor y riesgos.
+     * @see Poliza 
+     * @see RusPropuesta
+     */
     static mapear(propuesta: RusPropuesta, productor: Productor,riesgos: Poliza["riesgos"]): Poliza {
 
-        const inicioVigencia = this.parsearFecha(propuesta.inicioVigencia,"inicioVigencia");
+        const inicioVigencia = DateUtils.parsearFecha(propuesta.inicioVigencia,"inicioVigencia");
 
-        const finVigencia = this.parsearFecha(propuesta.finVigencia, "finVigencia");
+        const finVigencia = DateUtils.parsearFecha(propuesta.finVigencia, "finVigencia");
 
-        const inicioFacturacion = this.parsearFechaConFallback(propuesta.inicioPeriodoFacturacion,inicioVigencia);
+        const inicioFacturacion = DateUtils.parsearFechaConFallback(propuesta.inicioPeriodoFacturacion,inicioVigencia);
 
-        const finFacturacion = this.parsearFechaConFallback(propuesta.finPeriodoFacturacion,finVigencia);
+        const finFacturacion = DateUtils.parsearFechaConFallback(propuesta.finPeriodoFacturacion,finVigencia);
 
         return {
             id: `RUS_${propuesta.numeroPoliza}`,
@@ -44,12 +58,19 @@ export class RusPolizaMapper {
             vigencia: {
                 desde: inicioVigencia,
                 hasta: finVigencia,
-                diasParaVencer: this.calcularDiasParaVencer(finVigencia),
-                tipo: this.calcularTipoVigencia(inicioVigencia,finVigencia)
+                diasParaVencer: DateUtils.calcularDiasParaVencer(finVigencia),
+                tipo: DateUtils.calcularTipoVigencia(inicioVigencia,finVigencia)
             }
         };
     }
 
+    /**
+     * Método privado que obtiene el nombre del asegurado a partir de la propuesta. 
+     * @param propuesta es la propuesta de RUS de la cual se desea obtener el nombre del asegurado. 
+     * @returns una cadena con el nombre del asegurado, ya sea el nombre de la persona o la razón social, 
+     * o "SIN NOMBRE" si no se encuentra ninguno. 
+     * @see RusPropuesta
+     */
     private static obtenerNombreAsegurado(propuesta: RusPropuesta): string {
 
         const nombrePersona = propuesta.nombrePersona?.trim();
@@ -67,79 +88,5 @@ export class RusPolizaMapper {
         return "SIN NOMBRE";
     }
 
-    private static parsearFecha(valor: string,campo: string): Date {
 
-        if (!valor?.trim()) {
-            throw new Error(`RUS no informó ${campo}.`);
-        }
-
-        const fecha = new Date(`${valor.substring(0, 10)}T00:00:00`);
-
-        if (Number.isNaN(fecha.getTime())) {
-            throw new Error(`Fecha inválida en ${campo}: ${valor}`);
-        }
-
-        return fecha;
-    }
-
-    private static parsearFechaConFallback(valor: string | null | undefined,fallback: Date): Date {
-
-        if (!valor?.trim()) {
-            return new Date(
-                fallback.getTime()
-            );
-        }
-
-        const fecha = new Date(`${valor.substring(0, 10)}T00:00:00`);
-
-        if (Number.isNaN(fecha.getTime())) {
-            return new Date(fallback.getTime());
-        }
-
-        return fecha;
-    }
-
-    private static calcularDiasParaVencer(fechaHasta: Date): number {
-
-        const hoy = new Date();
-        hoy.setHours(0, 0, 0, 0);
-
-        const hasta = new Date(fechaHasta);
-        hasta.setHours(0, 0, 0, 0);
-
-        const diferencia = hasta.getTime() - hoy.getTime();
-
-        return Math.ceil(diferencia /(1000 * 60 * 60 * 24));
-    }
-
-    private static calcularTipoVigencia(desde: Date, hasta: Date): TipoVigencia {
-
-        const dias = Math.round(( hasta.getTime() - desde.getTime()) /(1000 * 60 * 60 * 24));
-
-        if (dias <= 35) {
-            return TipoVigencia.MENSUAL;
-        }
-
-        if (dias <= 70) {
-            return TipoVigencia.BIMESTRAL;
-        }
-
-        if (dias <= 100) {
-            return TipoVigencia.TRIMESTRAL;
-        }
-
-        if (dias <= 135) {
-            return TipoVigencia.CUATRIMESTRAL;
-        }
-
-        if (dias <= 200) {
-            return TipoVigencia.SEMESTRAL;
-        }
-
-        if (dias <= 380) {
-            return TipoVigencia.ANUAL;
-        }
-
-        return TipoVigencia.OTRA;
-    }
 }

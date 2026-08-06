@@ -12,8 +12,8 @@ dotenv.config({
     )
 });
 
+// Configuración de la URL base y la clave de suscripción para la API de Mercantil Andina
 const BASE_URL = process.env.MA_BASE_URL!;
-
 const SUBSCRIPTION_KEY = process.env.MA_SUBSCRIPTION_KEY!;
 
 /**

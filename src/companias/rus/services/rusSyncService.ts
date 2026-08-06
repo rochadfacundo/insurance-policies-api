@@ -17,6 +17,12 @@ export interface ResultadoRusSync {
 
 export class RusSyncService {
 
+
+    /**
+     * Crea una instancia de RusSyncService. 
+     * 
+     * @param carteraService instancia de RusCarteraService para obtener la cartera de un productor.  
+     */
     constructor(
         private readonly carteraService: RusCarteraService = new RusCarteraService()
     ) {}
@@ -24,9 +30,19 @@ export class RusSyncService {
     /**
      * Reconstruye la cartera del productor dentro de un rango,
      * detecta riesgos y los transforma al modelo general Poliza.
-     *
-     * Este método todavía no escribe en Firestore.
      */
+    /**
+     * Sincroniza la cartera de un productor en RUS dentro de un rango de fechas, 
+     * detectando riesgos y transformándolos al modelo general Poliza. 
+     * @param productor productor para el cual se realizará la sincronización. 
+     * @param fechaDesde fecha de inicio del rango de fechas para la sincronización (formato YYYY-MM-DD). 
+     * @param fechaHasta fecha de fin del rango de fechas para la sincronización (formato YYYY-MM-DD). 
+     * @param modo modo de sincronización a utilizar (completo o incremental). 
+     * @returns un objeto ResultadoRusSync con las métricas de la sincronización y las pólizas detectadas. 
+     * @see Poliza para la estructura de las pólizas.
+     * @see ResultadoRusSync para la estructura del resultado de la sincronización.
+     * @see Productor para la estructura del productor.
+    */
     async sincronizar(productor: Productor, fechaDesde: string,fechaHasta: string,modo: ModoSincronizacionRus): Promise<ResultadoRusSync> {
 
 
@@ -78,9 +94,8 @@ export class RusSyncService {
                 .sort((a, b) => Number(b.premio ?? 0) - Number(a.premio ?? 0)).slice(0, 10);
 
         const posiblesFlotas = propuestasVigentes.filter(propuesta =>
-                    propuesta.numeroSeccion === 4 ||
-                    propuesta.esFlota === true ||
-                    Number(propuesta.cantidadVehiculos ?? 0) > 1);
+                propuesta.numeroSeccion === 4 || propuesta.esFlota === true || Number(propuesta.cantidadVehiculos ?? 0) > 1
+                );
 
         console.log("");
         console.log("==================================================");
@@ -172,9 +187,7 @@ export class RusSyncService {
             filtradoVigentes: formatearDuracion(duracionFiltradoVigentes),
             diagnostico: formatearDuracion(duracionDiagnostico),
             deteccionRiesgos: formatearDuracion(duracionDeteccionRiesgos),
-            eliminacionDuplicados: formatearDuracion(
-                duracionEliminacionDuplicados
-            ),
+            eliminacionDuplicados: formatearDuracion(duracionEliminacionDuplicados),
             duracionTotal: formatearDuracion(duracionTotal)
         });
 
@@ -187,8 +200,12 @@ export class RusSyncService {
     }
 
     /**
-     * Considera únicamente pólizas válidas y vigentes.
-     */
+     * Determina si una propuesta de RUS está vigente según su número de póliza, premio y estado de vigencia. 
+     * @param propuesta La propuesta de RUS a evaluar. 
+     * @returns true si la propuesta está vigente, false en caso contrario. 
+     * @see Poliza para la estructura de las pólizas.
+ 
+    */
     private esPropuestaVigente(propuesta: RusPropuesta): boolean {
 
         if (!Number.isFinite( propuesta.numeroPoliza) || propuesta.numeroPoliza <= 0) {
@@ -204,12 +221,12 @@ export class RusSyncService {
         return estado === "VIGENTE";
     }
 
-    /**
-     * Elimina duplicados por número de póliza.
-     *
-     * Si aparecen varios endosos de la misma póliza,
-     * conserva el endoso más alto.
-     */
+   /**
+    * Elimina pólizas duplicadas por número de póliza, conservando la de mayor endoso. 
+    * @param polizas el arreglo de pólizas a filtrar.
+    * @returns un arreglo de pólizas sin duplicados, conservando la de mayor endoso por número de póliza. 
+    * @see Poliza para la estructura de las pólizas. 
+   */
     private eliminarDuplicados(polizas: Poliza[]): Poliza[] {
 
         const map = new Map<string, Poliza>();

@@ -12,7 +12,7 @@ export interface RiesgoRUS {
     cobertura: string;
     /**
          * Inicio real de la vigencia de la póliza.
-         */
+    */
     inicioVigencia: string;
 
     /**

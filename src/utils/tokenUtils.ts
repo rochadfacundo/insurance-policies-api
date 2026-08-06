@@ -5,6 +5,9 @@ import { TokenData } from "../models/tokenData";
 
 const TOKENS_DIR = path.resolve(__dirname,"../tokens");
 
+/**
+ * Asegura que el directorio para almacenar los tokens exista. 
+ */
 function asegurarDirectorioTokens(): void {
 
     if (!fs.existsSync(TOKENS_DIR)) {
@@ -15,6 +18,11 @@ function asegurarDirectorioTokens(): void {
 
 }
 
+/**
+ * Guarda un token en un archivo JSON dentro del directorio de tokens. 
+ * @param compania Nombre de la compañía para la cual se guarda el token. 
+ * @param data Objeto TokenData que contiene el token y su fecha de expiración. 
+ */
 export function guardarToken(compania: string,data: TokenData): void {
 
     asegurarDirectorioTokens();
@@ -24,6 +32,7 @@ export function guardarToken(compania: string,data: TokenData): void {
     fs.writeFileSync(archivo,JSON.stringify(data,null,2),"utf8");
 
 }
+
 
 export function leerToken(compania: string): TokenData | null {
 

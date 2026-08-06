@@ -12,6 +12,9 @@ const BASE_URL = process.env.MA_BASE_URL!;
 
 const SUBSCRIPTION_KEY = process.env.MA_SUBSCRIPTION_KEY!;
 
+/**
+ * Ejemplo de cómo obtener la lista de productores desde la API de Mercantil Andina.
+ */
 async function obtenerProductores() {
 
     try {

@@ -7,16 +7,32 @@ import axios from "axios";
 import { ECompania } from "../../../models/eCompania";
 import { FirestoreErrorRepository } from "../../../repositories/firebaseErrorRepository";
 
-
+/**
+ * Servicio para sincronizar la cartera de un productor en Mercantil, detectando riesgos y transformándolos al modelo general Poliza.
+ */
 export class MercantilSyncService {
 
+  /**
+   * Crea una instancia de MercantilSyncService. 
+   * @param mercantilService instancia de MercantilCarteraService para obtener la cartera de un productor. 
+   * @param errorRepository  instancia de FirestoreErrorRepository para guardar errores de sincronización en Firestore.
+   */
   constructor(
     private readonly mercantilService =  new MercantilCarteraService(),
     private readonly errorRepository = new FirestoreErrorRepository()
 ) {}
 
     /**
-     * Sincroniza la cartera completa de un productor.
+     * Sincroniza la cartera de un productor en Mercantil, detectando riesgos y transformándolos al modelo general Poliza.
+     * Si ocurre un error al procesar una póliza, se guarda el error en Firestore y se omite la póliza.
+     * @param productor productor para el cual se realizará la sincronización. 
+     * @returns un arreglo de objetos Poliza con las pólizas detectadas y sus riesgos.
+     * @see Poliza
+     * @see MercantilPolizaMapper  
+     * @see MercantilRiskEngine
+     * @see FirestoreErrorRepository
+     * @see MercantilCarteraService
+     * @see Productor
      */
     async sincronizar(productor: Productor): Promise<Poliza[]> {
 

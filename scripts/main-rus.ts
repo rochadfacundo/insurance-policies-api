@@ -39,8 +39,8 @@ const FORZAR_BOOTSTRAP = true;
  * Rango utilizado para reconstruir la cartera.
  * Debe cubrir todas las pólizas que todavía podrían estar vigentes.
  */
-const FECHA_DESDE = "2025-08-04";
-const FECHA_HASTA = "2026-08-04";
+const FECHA_DESDE = "2025-08-06";
+const FECHA_HASTA = "2026-08-06";
 
 
 async function main(): Promise<void> {

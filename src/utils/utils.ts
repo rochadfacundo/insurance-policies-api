@@ -1,3 +1,5 @@
+import axios from "axios";
+
     
     /*
         * Parsea una fecha y lanza error si es inválida.
@@ -7,6 +9,12 @@
         * @param fecha Fecha a parsear en formato YYYY-MM-DD.
         * @return La fecha parseada como objeto Date.
         * @throws Error si la fecha es inválida o no se pudo parsear.
+    */
+   /**
+    * Parsea una fecha en formato YYYY-MM-DD a un objeto Date. 
+    * @param fecha Fecha en formato YYYY-MM-DD a parsear. 
+    * @returns Un objeto Date correspondiente a la fecha parseada.
+    * @see MercantilPolizaManager 
     */
     export function parseFecha(fecha: string): Date {
     
@@ -176,5 +184,28 @@
     
         return `${minutos}m ${segundos}s`;
     }
+
+
+    /**
+     * verifica si se responde con el error interno SQL0305.   
+     * @param error error de axios 
+     * @returns retorna true si es el error SQL0305, false en caso contrario. 
+     */
+    export function esErrorSql0305(error: unknown): boolean {
+    
+        if (!axios.isAxiosError(error)) {
+            return false;
+        }
+    
+        const data = error.response?.data as {
+            errores?: Array<{
+                id?: string;
+                texto?: string;
+            }>;
+        } | undefined;
+    
+        return data?.errores?.some(item => item.id === "SQL0305") ?? false;
+    }
+    
     
  

@@ -14,18 +14,32 @@ import { MotivoEliminacionPoliza } from "../models/polizaEliminada";
 
 export class FirestorePolizaRepository {
 
+    /**
+     * Atributos privados de la clase FirestorePolizaRepository.
+     * Colección de Firestore donde se almacenan las pólizas y la instancia de Firestore.
+     * COLLECTION_NAME: Nombre de la colección de Firestore donde se almacenan las pólizas.
+     * BATCH_SIZE: Tamaño del lote para operaciones de escritura en Firestore.
+     * polizaEliminadaRepository: Instancia de FirestorePolizaEliminadaRepository para manejar pólizas eliminadas.
+     * firestore: Instancia de Firestore utilizada para interactuar con la base de datos.
+     */
     private readonly COLLECTION_NAME = "polizas";
     private readonly BATCH_SIZE = 400;
-
     private readonly polizaEliminadaRepository: FirestorePolizaEliminadaRepository;
-
     private readonly firestore: Firestore;
 
+    /**
+     * Crea una instancia de FirestorePolizaRepository y establece la conexión con Firestore. 
+     */
     constructor() {
         this.firestore = FirebaseConfig.getFirestore();
         this.polizaEliminadaRepository = new FirestorePolizaEliminadaRepository();
     }
 
+    /**
+     * Guarda o actualiza una póliza en Firestore. 
+     * @param poliza póliza que se desea guardar o actualizar en Firestore.
+     * @returns una promesa que se resuelve cuando la póliza ha sido guardada o actualizada en Firestore. 
+     */
     async guardar(poliza: Poliza): Promise<void> {
 
         const referencia = this.firestore
@@ -49,6 +63,11 @@ export class FirestorePolizaRepository {
         await referencia.set(datos);
     }
 
+    /**
+     * Guarda o actualiza varias pólizas en Firestore en lotes. 
+     * @param polizas arreglo de pólizas que se desean guardar o actualizar en Firestore. 
+     * @returns una promesa que se resuelve cuando todas las pólizas han sido guardadas o actualizadas en Firestore. 
+     */
     async guardarMuchas(polizas: Poliza[]): Promise<void> {
 
         if (polizas.length === 0) {
@@ -70,6 +89,11 @@ export class FirestorePolizaRepository {
         }
     }
 
+    /**
+     * Guarda o actualiza un lote de pólizas en Firestore utilizando una operación de escritura por lotes. 
+     * @param polizas arreglo de pólizas que se desean guardar o actualizar en Firestore.
+     * @returns una promesa que se resuelve cuando todas las pólizas del lote han sido guardadas o actualizadas en Firestore. 
+     */
     private async guardarLote(polizas: Poliza[]): Promise<void> {
     
         const referencias = polizas.map(poliza => this.firestore.collection(this.COLLECTION_NAME).doc(poliza.id));
@@ -102,6 +126,14 @@ export class FirestorePolizaRepository {
         await batch.commit();
     }
 
+    /**
+     * Prepara un objeto Poliza para ser guardado en Firestore, eliminando los campos undefined y agregando las fechas de creación y actualización. 
+     * @param poliza póliza que se desea preparar para ser guardada en Firestore. 
+     * @param fechaCreacion fecha de creación de la póliza, que se utiliza si la póliza ya existe en Firestore.      
+     * @param fechaActualizacion fecha de actualización de la póliza, que se establece en el momento de guardar o actualizar
+     *  la póliza en Firestore. 
+     * @returns un objeto que contiene los datos de la póliza listos para ser guardados en Firestore. 
+     */
     private prepararDocumento(poliza: Poliza, fechaCreacion: Timestamp,fechaActualizacion: Timestamp): Record<string, unknown> {
     
         return this.eliminarUndefined<Record<string, unknown>>({
@@ -111,6 +143,12 @@ export class FirestorePolizaRepository {
         });
     }
 
+    /**
+     * Mapea un documento de Firestore a un objeto Poliza, convirtiendo las fechas de Timestamp a Date. 
+     * @param id identificador del documento de Firestore que se está mapeando. 
+     * @param datos datos del documento de Firestore que se están mapeando a un objeto Poliza. 
+     * @returns un objeto Poliza que contiene los datos del documento de Firestore mapeados y las fechas convertidas a Date.      
+     */
     private mapearDocumento(id: string,datos: FirebaseFirestore.DocumentData): Poliza {
     
         return {
@@ -149,6 +187,11 @@ export class FirestorePolizaRepository {
         } as Poliza;
     }
     
+    /**
+     * Convierte un valor de tipo Timestamp o Date a Date, o devuelve undefined si el valor es undefined. 
+     * @param valor valor de tipo Timestamp, Date o undefined que se desea convertir a Date. 
+     * @returns un objeto Date si el valor es de tipo Timestamp o Date, o undefined si el valor es undefined. 
+     */
     private convertirFecha(valor: Timestamp | Date | undefined): Date | undefined {
     
         if (valor instanceof Timestamp) {
@@ -158,6 +201,11 @@ export class FirestorePolizaRepository {
         return valor;
     }
 
+    /**
+     * Obtiene una póliza de Firestore por su ID. 
+     * @param id identificador de la póliza que se desea obtener. 
+     * @returns retorna una promesa que se resuelve con un objeto Poliza si se encuentra la póliza, o null si no se encuentra. 
+     */
     async obtenerPorId(id: string): Promise<Poliza | null> {
     
         const documento = await this.firestore.collection(this.COLLECTION_NAME).doc(id).get();
@@ -169,11 +217,23 @@ export class FirestorePolizaRepository {
         return this.mapearDocumento(documento.id, documento.data()!);
     }
 
+    /**
+     * Elimina una póliza de Firestore por su ID. 
+     * @param id identificador de la póliza que se desea eliminar.
+     * @returns retorna una promesa que se resuelve cuando la póliza ha sido eliminada de Firestore. 
+     */
     async eliminar(id: string): Promise<void> {
     
         await this.firestore.collection(this.COLLECTION_NAME).doc(id).delete();
     }
 
+    /**
+     * Obtiene todas las pólizas de un productor específico, opcionalmente filtradas por compañía. 
+     * @param codigoProductor código del productor para el cual se desean obtener las pólizas. 
+     * @param compania opcionalmente, compañía por la cual se desea filtrar las pólizas. 
+     * @returns retorna una promesa que se resuelve con un arreglo de objetos Poliza que pertenecen al productor y, 
+     * si se especifica, a la compañía indicada. 
+     */
     async obtenerPorProductor(codigoProductor: number, compania?: ECompania): Promise<Poliza[]> {
     
         let consulta: FirebaseFirestore.Query = this.firestore.collection(this.COLLECTION_NAME)
@@ -188,6 +248,11 @@ export class FirestorePolizaRepository {
         return resultado.docs.map(documento => this.mapearDocumento(documento.id, documento.data()));
     }
 
+    /**
+     * Obtiene todas las pólizas de una compañía específica. 
+     * @param compania compañía por la cual se desea filtrar las pólizas. 
+     * @returns retorna una promesa que se resuelve con un arreglo de objetos Poliza que pertenecen a la compañía indicada. 
+     */
     async obtenerPorCompania(compania: ECompania): Promise<Poliza[]> {
     
         const resultado = await this.firestore.collection(this.COLLECTION_NAME).where("compania", "==", compania).get();
@@ -195,6 +260,11 @@ export class FirestorePolizaRepository {
         return resultado.docs.map(documento => this.mapearDocumento(documento.id, documento.data()));
     }
 
+    /**
+     * Elimina recursivamente los campos undefined de un objeto o arreglo, devolviendo una nueva instancia sin esos campos. 
+     * @param valor objeto o arreglo del cual se desean eliminar los campos undefined. 
+     * @returns una nueva instancia del objeto o arreglo sin los campos undefined. 
+     */
     private eliminarUndefined<T>(
         valor: T
     ): T {
@@ -232,6 +302,14 @@ export class FirestorePolizaRepository {
     Detecta cuáles ya no aparecen.
     Los mueve a polizasEliminadas.
     Elimina de polizas los que dejaron de ser riesgo.
+    */
+   /**
+    * Sincroniza los riesgos de un productor específico, comparando los riesgos actuales con los riesgos guardados en Firestore. 
+    * @param productor productor para el cual se desea sincronizar los riesgos.   
+    * @param compania compañía por la cual se desea filtrar los riesgos.
+    * @param riesgosActuales riesgos actuales que se desean sincronizar con los riesgos guardados en Firestore.
+    * @returns retorna una promesa que se resuelve con un objeto ResultadoSincronizacionRiesgos que contiene
+    *  información sobre la cantidad de riesgos actuales, nuevos, actualizados y eliminados durante la sincronización. 
     */
     async sincronizarRiesgosProductor(productor: Productor, compania: ECompania, riesgosActuales: Poliza[]): Promise<ResultadoSincronizacionRiesgos> {
 
@@ -315,14 +393,14 @@ export class FirestorePolizaRepository {
 
     /**
      *  Sincroniza los riesgos incrementales de un productor.
-     * @param polizas    
-     * @returns  
+     * @param polizas arreglo de pólizas que se desean sincronizar en Firestore.    
+     * @returns  retorna una promesa que se resuelve con un objeto que contiene información sobre la cantidad de riesgos
+     *  actuales, nuevos, actualizados y eliminados durante la sincronización. 
      */
     async sincronizarRiesgosIncrementales(polizas: Poliza[]): Promise<{
         riesgosActuales: number;
         riesgosNuevos: number;
-        riesgosActualizados: number;
-        riesgosEliminados: number;
+        riesgosActualizados: number;riesgosEliminados: number;
     }> {
     
         if (polizas.length === 0) {
@@ -334,46 +412,26 @@ export class FirestorePolizaRepository {
             };
         }
     
-        const coleccion =
-            this.firestore.collection(this.COLLECTION_NAME);
+        const coleccion = this.firestore.collection(this.COLLECTION_NAME);
     
         let riesgosNuevos = 0;
         let riesgosActualizados = 0;
     
-        for (
-            let indice = 0;
-            indice < polizas.length;
-            indice += this.BATCH_SIZE
-        ) {
-            const lote = polizas.slice(
-                indice,
-                indice + this.BATCH_SIZE
-            );
+        for (let indice = 0; indice < polizas.length; indice += this.BATCH_SIZE) {
+            const lote = polizas.slice(indice, indice + this.BATCH_SIZE);
     
-            const referencias = lote.map(poliza =>
-                coleccion.doc(poliza.id)
-            );
+            const referencias = lote.map(poliza => coleccion.doc(poliza.id));
     
-            const documentosExistentes =
-                await this.firestore.getAll(...referencias);
+            const documentosExistentes = await this.firestore.getAll(...referencias);
     
             const batch = this.firestore.batch();
     
-            for (
-                let posicion = 0;
-                posicion < lote.length;
-                posicion++
-            ) {
+            for (let posicion = 0; posicion < lote.length; posicion++) {
                 const poliza = lote[posicion];
                 const referencia = referencias[posicion];
-                const documentoExistente =
-                    documentosExistentes[posicion];
+                const documentoExistente = documentosExistentes[posicion];
     
-                if (
-                    poliza === undefined ||
-                    referencia === undefined ||
-                    documentoExistente === undefined
-                ) {
+                if ( poliza === undefined ||referencia === undefined || documentoExistente === undefined) {
                     continue;
                 }
     

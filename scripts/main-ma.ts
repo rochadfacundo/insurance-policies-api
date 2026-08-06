@@ -23,57 +23,24 @@ import {
 import {
     ErrorSincronizacion
 } from "../src/models/errorSincronizacion";
-
-
-interface ErrorProductor {
-    codigo: number;
-    nombre: string;
-    status?: number;
-    mensaje: string;
-    detalle?: unknown;
-}
-
-
-interface ResumenGeneral {
-    productoresTotales: number;
-    productoresProcesados: number;
-    productoresExitosos: number;
-    productoresConError: number;
-
-    riesgosActuales: number;
-    riesgosNuevos: number;
-    riesgosActualizados: number;
-    riesgosEliminados: number;
-
-    duracionTotal: string;
-}
-
-
-interface ErrorNormalizado {
-    mensaje: string;
-    status?: number;
-    detalle?: unknown;
-}
-
+import { ErrorProductor } from "../src/models/errorProductor";
+import { ResumenGeneral } from "../src/models/sync";
+import { formatearDuracion } from "../src/utils/utils";
+import { mostrarResumen, normalizarError, obtenerMensajeError } from "../src/utils/syncUtils";
 
 async function main(): Promise<void> {
 
     const inicioGeneral = Date.now();
 
     const syncService = new MercantilSyncService();
-
     const polizaRepository = new FirestorePolizaRepository();
-
     const errorRepository = new FirestoreErrorRepository();
 
     /*
      * Procesamos solamente productores activos.
-     *
-     * Si estado_id no existe en tu modelo o los activos usan otro valor,
-     * eliminá esa condición.
-     */
+        * Para pruebas, se puede filtrar por código de productor.
+    */
     const productores = obtenerProductoresMercantil().filter(productor => productor.estado_id === 1);
-
 
 
     const erroresProductores: ErrorProductor[] = [];
@@ -251,294 +218,22 @@ async function main(): Promise<void> {
 }
 
 
-function mostrarResumen(
-    resumen: ResumenGeneral,
-    errores: ErrorProductor[]
-): void {
-
-    console.log("");
-    console.log("==================================================");
-    console.log("RESUMEN GENERAL");
-    console.log("==================================================");
-
-    console.log({
-        productoresTotales:
-            resumen.productoresTotales,
-
-        productoresProcesados:
-            resumen.productoresProcesados,
-
-        productoresExitosos:
-            resumen.productoresExitosos,
-
-        productoresConError:
-            resumen.productoresConError,
-
-        riesgosActuales:
-            resumen.riesgosActuales,
-
-        riesgosNuevos:
-            resumen.riesgosNuevos,
-
-        riesgosActualizados:
-            resumen.riesgosActualizados,
-
-        riesgosEliminados:
-            resumen.riesgosEliminados,
-
-        duracionTotal:
-            resumen.duracionTotal
-    });
-
-    if (errores.length === 0) {
-
-        console.log("");
-        console.log(
-            "Sincronización completada sin errores."
-        );
-
-        return;
-    }
-
-    console.log("");
-    console.log("==================================================");
-    console.log("PRODUCTORES CON ERROR");
-    console.log("==================================================");
-
-    console.table(
-        errores.map(
-            error => ({
-                codigo:
-                    error.codigo,
-
-                nombre:
-                    error.nombre,
-
-                status:
-                    error.status ?? "-",
-
-                mensaje:
-                    error.mensaje
-            })
-        )
-    );
-}
-
-
-function normalizarError(
-    error: unknown
-): ErrorNormalizado {
-
-    if (axios.isAxiosError(error)) {
-
-        const resultado: ErrorNormalizado = {
-            mensaje:
-                obtenerMensajeAxios(error)
-        };
-
-        if (
-            error.response?.status !==
-            undefined
-        ) {
-            resultado.status =
-                error.response.status;
-        }
-
-        if (
-            error.response?.data !==
-            undefined
-        ) {
-            resultado.detalle =
-                error.response.data;
-        }
-
-        return resultado;
-    }
-
-    if (error instanceof Error) {
-        return {
-            mensaje:
-                error.message
-        };
-    }
-
-    return {
-        mensaje:
-            "Error desconocido",
-
-        detalle:
-            error
-    };
-}
-
-
-function obtenerMensajeAxios(
-    error: unknown
-): string {
-
-    if (!axios.isAxiosError(error)) {
-        return "Error HTTP desconocido";
-    }
-
-    const data =
-        error.response?.data;
-
-    if (
-        data !== null &&
-        typeof data === "object"
-    ) {
-
-        if (
-            "message" in data &&
-            typeof data.message === "string" &&
-            data.message.trim().length > 0
-        ) {
-            return data.message;
-        }
-
-        if (
-            "mensaje" in data &&
-            typeof data.mensaje === "string" &&
-            data.mensaje.trim().length > 0
-        ) {
-            return data.mensaje;
-        }
-
-        if (
-            "errores" in data &&
-            Array.isArray(data.errores)
-        ) {
-
-            const mensajes =
-                data.errores
-                    .map(
-                        (
-                            item: {
-                                texto?: unknown;
-                                mensaje?: unknown;
-                            } | null
-                        ): string | undefined => {
-
-                            if (
-                                item === null ||
-                                typeof item !== "object"
-                            ) {
-                                return undefined;
-                            }
-
-                            if (
-                                typeof item.texto ===
-                                "string"
-                            ) {
-                                return item.texto;
-                            }
-
-                            if (
-                                typeof item.mensaje ===
-                                "string"
-                            ) {
-                                return item.mensaje;
-                            }
-
-                            return undefined;
-                        }
-                    )
-                    .filter(
-                        (
-                            mensaje:
-                                string |
-                                undefined
-                        ): mensaje is string =>
-                            mensaje !== undefined
-                    );
-
-            if (mensajes.length > 0) {
-                return mensajes.join(" | ");
-            }
-        }
-    }
-
-    return (
-        error.message ||
-        `Error HTTP ${
-            error.response?.status ??
-            "desconocido"
-        }`
-    );
-}
-
-
-function obtenerMensajeError(
-    error: unknown
-): string {
-
-    if (error instanceof Error) {
-        return error.message;
-    }
-
-    return String(error);
-}
-
-
-function formatearDuracion(
-    milisegundos: number
-): string {
-
-    const segundosTotales =
-        Math.floor(
-            milisegundos / 1000
-        );
-
-    const horas =
-        Math.floor(
-            segundosTotales / 3600
-        );
-
-    const minutos =
-        Math.floor(
-            (
-                segundosTotales % 3600
-            ) / 60
-        );
-
-    const segundos =
-        segundosTotales % 60;
-
-    if (horas > 0) {
-        return (
-            `${horas}h ` +
-            `${minutos}m ` +
-            `${segundos}s`
-        );
-    }
-
-    return (
-        `${minutos}m ` +
-        `${segundos}s`
-    );
-}
 
 
 main()
     .then(() => {
 
         console.log("");
-        console.log(
-            "Proceso general finalizado."
-        );
+        console.log("Proceso general finalizado.");
 
     })
     .catch(
         (error: unknown) => {
 
             console.error("");
-            console.error(
-                "El proceso general finalizó con un error fatal."
-            );
+            console.error("El proceso general finalizó con un error fatal.");
 
-            console.error(
-                obtenerMensajeError(error)
-            );
+            console.error(obtenerMensajeError(error));
 
             process.exitCode = 1;
         }

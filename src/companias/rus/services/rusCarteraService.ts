@@ -19,17 +19,26 @@ import { obtenerDetallePropuesta, obtenerPropuestas } from "./rusPropuestasServi
  */
 export class RusCarteraService {
 
+    /**
+     * Número de página por defecto para las consultas a RUS.
+     */
     private readonly defaultPagina: number;
 
+    /**
+     * Crea una instancia de RusCarteraService. 
+     * Recibe un parámetro opcional para establecer el número de página por defecto para las consultas a RUS.
+     * @param defaultPagina número de página por defecto para las consultas a RUS (opcional, por defecto es 0). 
+     */
     constructor(defaultPagina: number = 0) {
         this.defaultPagina = defaultPagina;
     }
 
 
     /**
-     * Crea un RusPropuestasManager a partir de una lista acumulada.
-     * Asume que las propuestas ya fueron filtradas por fecha y productor.
-     * No realiza llamadas adicionales, solo formatea la respuesta para el manager.
+     * Crea un RusPropuestasManager a partir de un array de propuestas. 
+     * @param propuestas propuestas a incluir en el manager.  
+     * @returns Un RusPropuestasManager con las propuestas proporcionadas. 
+     * @see RusPropuestasManager 
      */
     private crearManagerDesdePropuestas(propuestas: RusPropuesta[]): RusPropuestasManager {
 
@@ -46,24 +55,35 @@ export class RusCarteraService {
     }
 
     /**
-     * Obtiene el detalle completo de una propuesta.
-     */
+     * Obtiene el detalle de una propuesta específica. 
+     * @param prop propuesta de la cual se desea obtener el detalle. 
+     * @returns Un objeto con el detalle de la propuesta, tal como lo devuelve RUS. 
+     * @see RusPropuestasManager 
+    */
     async obtenerDetalleDePropuesta(prop: RusPropuesta): Promise<any> {
         return await obtenerDetallePropuesta(prop.numeroSeccion, prop.propuesta, prop.endoso,prop.renovacion);
     }
 
 
     /**
-     * Obtiene cartera de un año específico.
-     */
+     * Obtiene cartera de un año específico. 
+     * @param productor productor del cual se desea obtener la cartera.      
+     * @param anio año del cual se desea obtener la cartera. 
+     * @returns Un RusPropuestasManager con las propuestas emitidas por el productor en el año especificado. 
+     * @see RusPropuestasManager 
+    */
     async obtenerPorAnio(productor: number,anio: number): Promise<RusPropuestasManager> {
 
         return await this.obtenerCarteraPorRango(productor,`${anio}-01-01`,`${anio}-12-31`);
     }
 
     /**
-     * Obtiene cartera de los últimos X días.
-     */
+     * Obtiene cartera de los últimos X días. 
+     * @param productor productor del cual se desea obtener la cartera. 
+     * @param dias cantidad de días hacia atrás desde la fecha actual para obtener la cartera. 
+     * @returns Un RusPropuestasManager con las propuestas emitidas por el productor en los últimos X días. 
+     * @see RusPropuestasManager 
+    */
     async obtenerUltimosDias(productor: number, dias: number): Promise<RusPropuestasManager> {
 
         const hasta = new Date();
@@ -77,24 +97,35 @@ export class RusCarteraService {
 
 
     /**
-     * Obtiene cartera de los últimos 30 días.
-     */
+     * Obtiene cartera de los últimos 30 días. 
+     * @param productor productor del cual se desea obtener la cartera. 
+     * @returns Un RusPropuestasManager con las propuestas emitidas por el productor en los últimos 30 días. 
+     * @see RusPropuestasManager 
+    */
     async obtenerUltimos30Dias(productor: number): Promise<RusPropuestasManager> {
 
         return await this.obtenerUltimosDias(productor,30);
     }
 
     /**
-     * Obtiene cartera de los últimos 7 días.
-     */
+     * Obtiene cartera de la última semana (7 días). 
+     * @param productor productor del cual se desea obtener la cartera. 
+     * @returns Un RusPropuestasManager con las propuestas emitidas por el productor en los últimos 7 días.
+     * @see RusPropuestasManager 
+    */
     async obtenerUltimaSemana(productor: number): Promise<RusPropuestasManager> {
 
         return await this.obtenerUltimosDias(productor,  7);
     }
 
     /**
-     * Obtiene cartera de un mes específico.
-     */
+     * Obtiene cartera de un mes específico. 
+     * @param productor productor del cual se desea obtener la cartera. 
+     * @param anio año del cual se desea obtener la cartera. 
+     * @param mes mes del cual se desea obtener la cartera (1-12). 
+     * @returns Un RusPropuestasManager con las propuestas emitidas por el productor en el mes especificado. 
+     * @see RusPropuestasManager 
+    */
     async obtenerPorMes(productor: number,anio: number,mes: number): Promise<RusPropuestasManager> {
 
         const desde = new Date(anio, mes - 1, 1);
@@ -104,8 +135,13 @@ export class RusCarteraService {
     }
 
     /**
-     * Obtiene la cartera acumulada de varios productores.
-     */
+     * Obtiene cartera de varios productores dentro de un rango de fechas. 
+     * @param productores array de productores de los cuales se desea obtener la cartera. 
+     * @param fechaDesde fecha inicial del rango (inclusive) en formato YYYY-MM-DD. 
+     * @param fechaHasta fecha final del rango (inclusive) en formato YYYY-MM-DD. 
+     * @returns Un RusPropuestasManager con las propuestas emitidas por los productores en el rango de fechas especificado. 
+     * @see RusPropuestasManager 
+    */
     async obtenerCarteraProductores(productores: number[],fechaDesde: string,fechaHasta: string): Promise<RusPropuestasManager> {
 
         const propuestas: RusPropuesta[] = [];
@@ -122,13 +158,14 @@ export class RusCarteraService {
         return this.crearManagerDesdePropuestas(propuestasSinDuplicados);
     }
 
-
-    
-
-
     /**
-     * Obtiene cartera para un productor dentro de un rango de fechas.
-     */
+     * Obtiene cartera de un productor dentro de un rango de fechas.
+     * @param productor  productor del cual se desea obtener la cartera.
+     * @param fechaDesde fecha inicial del rango (inclusive) en formato YYYY-MM-DD. 
+     * @param fechaHasta fecha final del rango (inclusive) en formato YYYY-MM-DD. 
+     * @returns Un RusPropuestasManager con las propuestas emitidas por el productor en el rango de fechas especificado. 
+     * @see RusPropuestasManager 
+    */
     async obtenerCarteraPorRango(productor: number, fechaDesde: string, fechaHasta: string): Promise<RusPropuestasManager> {
     
         //debug trazo
@@ -230,7 +267,7 @@ export class RusCarteraService {
         }*/
 
         // Nueva logica concurrente
-        const CONCURRENCIA_RUS = 6;
+        const CONCURRENCIA_RUS =12;
 
         for (let indice = 0;indice < fechas.length;indice += CONCURRENCIA_RUS) {
             const loteFechas = fechas.slice(indice,indice + CONCURRENCIA_RUS);
@@ -352,9 +389,12 @@ export class RusCarteraService {
     }
 
     /**
-     * Obtiene todas las páginas de propuestas
-     * de un productor para una fecha puntual.
-     */
+     * Obtiene propuestas de un productor en una fecha específica. 
+     * @param productor productor del cual se desea obtener las propuestas. 
+     * @param fechaEmision fecha de emisión de las propuestas a obtener en formato YYYY-MM-DD. 
+     * @returns Un RusPropuestasResponse con las propuestas emitidas por el productor en la fecha especificada. 
+     * @see RusPropuestasManager 
+    */
     async obtenerPorFecha(productor: number, fechaEmision: string): Promise<RusPropuestasResponse> {
 
         const propuestasAcumuladas: RusPropuesta[] = [];
@@ -411,78 +451,87 @@ export class RusCarteraService {
         };
     }
 
-    /*
- * Obtiene propuestas con reintentos en caso de error.
- * Limita la cantidad de intentos para evitar bucles infinitos.
- */
-private async obtenerPropuestasConReintento(
-    request: RusPropuestasRequest,
-    productor: number,
-    fechaEmision: string,
-    pagina: number
-): Promise<RusPropuestasResponse> {
+    /**
+     * Obtiene propuestas de RUS con reintentos en caso de error. 
+     * @param request request de tipo RusPropuestasRequest que contiene los parámetros de la consulta.    
+     * @param productor productor del cual se desea obtener las propuestas. 
+     * @param fechaEmision fecha de emisión de las propuestas a obtener en formato YYYY-MM-DD. 
+     * @param pagina página de resultados a obtener. 
+     * @returns Un RusPropuestasResponse con las propuestas emitidas por el productor en la fecha especificada y página indicada. 
+     * @see RusPropuestasManager 
+    */
+    private async obtenerPropuestasConReintento(
+        request: RusPropuestasRequest,
+        productor: number,
+        fechaEmision: string,
+        pagina: number
+    ): Promise<RusPropuestasResponse> {
 
-    const MAX_INTENTOS = 5;
+        const MAX_INTENTOS = 5;
 
-    const demorasMs = [
-        15_000,
-        30_000,
-        60_000,
-        120_000
-    ];
+        const demorasMs = [
+            15_000,
+            30_000,
+            60_000,
+            120_000
+        ];
 
-    let ultimoError: unknown;
+        let ultimoError: unknown;
 
-    for (let intento = 1; intento <= MAX_INTENTOS; intento++) {
-        try {
+        for (let intento = 1; intento <= MAX_INTENTOS; intento++) {
+            try {
 
-            const response = await obtenerPropuestas(request);
+                const response = await obtenerPropuestas(request);
 
-            if (response && response.paging && Array.isArray(response.results)) {
-                return response;
+                if (response && response.paging && Array.isArray(response.results)) {
+                    return response;
+                }
+
+                throw new Error(`Respuesta inválida: ${JSON.stringify(response)}`);
+
+            } catch (error) {
+
+                ultimoError = error;
+
+                if (intento >= MAX_INTENTOS) {
+                    break;
+                }
+
+                const demora = demorasMs[intento - 1]   ?? 120_000;
+
+                console.warn(
+                    `RUS falló. ` +
+                    `Reintentando en ${demora / 1000}s. ` +
+                    `Intento ${intento}/${MAX_INTENTOS}. ` +
+                    `Productor: ${productor}. ` +
+                    `Fecha: ${fechaEmision}. ` +
+                    `Página: ${pagina}. ` +
+                    `Error: ${obtenerMensajeError(error)}`
+                );
+
+                await esperar(demora);
             }
-
-            throw new Error(`Respuesta inválida: ${JSON.stringify(response)}`);
-
-        } catch (error) {
-
-            ultimoError = error;
-
-            if (intento >= MAX_INTENTOS) {
-                break;
-            }
-
-            const demora = demorasMs[intento - 1]   ?? 120_000;
-
-            console.warn(
-                `RUS falló. ` +
-                `Reintentando en ${demora / 1000}s. ` +
-                `Intento ${intento}/${MAX_INTENTOS}. ` +
-                `Productor: ${productor}. ` +
-                `Fecha: ${fechaEmision}. ` +
-                `Página: ${pagina}. ` +
-                `Error: ${obtenerMensajeError(error)}`
-            );
-
-            await esperar(demora);
         }
-    }
 
-    throw new Error(
-        `RUS falló luego de ${MAX_INTENTOS} intentos. ` +
-        `Productor: ${productor}. ` +
-        `Fecha: ${fechaEmision}. ` +
-        `Página: ${pagina}. ` +
-        `Error: ${obtenerMensajeError(ultimoError)}`
-    );
-}
+        throw new Error(
+            `RUS falló luego de ${MAX_INTENTOS} intentos. ` +
+            `Productor: ${productor}. ` +
+            `Fecha: ${fechaEmision}. ` +
+            `Página: ${pagina}. ` +
+            `Error: ${obtenerMensajeError(ultimoError)}`
+        );
+    }
 
 
 
     
     /**
-     * Obtiene cartera de los últimos X meses.
-     */
+     * Obtiene cartera de los últimos X meses. 
+     * @param productor productor del cual se desea obtener la cartera. 
+     * @param meses meses hacia atrás desde la fecha actual para obtener la cartera. 
+     * @returns Un RusPropuestasManager con las propuestas emitidas por el productor en los últimos X meses. 
+     * @see RusPropuestasManager 
+    */
     async obtenerUltimosMeses(productor: number,meses: number): Promise<RusPropuestasManager> {
 
         const hasta = new Date();
@@ -494,15 +543,21 @@ private async obtenerPropuestasConReintento(
     }
 
     /**
-     * Obtiene cartera de los últimos 6 meses.
-     */
+     * Obtiene cartera de los últimos 6 meses. 
+     * @param productor productor del cual se desea obtener la cartera. 
+     * @returns Un RusPropuestasManager con las propuestas emitidas por el productor en los últimos 6 meses. 
+     * @see RusPropuestasManager 
+    */
     async obtenerUltimos6Meses(productor: number): Promise<RusPropuestasManager> {
         return await this.obtenerUltimosMeses(productor, 6);
     }
 
     /**
-     * Obtiene cartera del último año.
-     */
+     * Obtiene cartera de los últimos 12 meses (1 año). 
+     * @param productor productor del cual se desea obtener la cartera. 
+     * @returns Un RusPropuestasManager con las propuestas emitidas por el productor en los últimos 12 meses. 
+     * @see RusPropuestasManager 
+    */
     async obtenerUltimoAnio(productor: number): Promise<RusPropuestasManager> {
         return await this.obtenerUltimosMeses(productor, 12);
     }
@@ -510,8 +565,11 @@ private async obtenerPropuestasConReintento(
     
 
     /**
-     * Elimina propuestas duplicadas.
-     * Prioriza numeroPoliza y, si no existe, usa id.
+     * Elimina propuestas duplicadas de un array de propuestas. 
+     * @param propuestas array de propuestas del cual se desea eliminar duplicados. 
+     * @returns Un array de propuestas sin duplicados, 
+     *  * @see RusPropuestasManagerdonde 
+     * se considera duplicado a una propuesta con el mismo número de póliza o el mismo ID. 
      */
     private eliminarDuplicados(propuestas: RusPropuesta[]): RusPropuesta[] {
 

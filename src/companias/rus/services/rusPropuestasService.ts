@@ -12,6 +12,13 @@ import {
     *
     * Si el token almacenado es rechazado, solicita uno nuevo y reintenta.
 */
+/**
+ * Obtiene las propuestas de un productor desde RUS. 
+ * @param body El objeto RusPropuestasRequest que contiene los parámetros de la solicitud. 
+ * @returns Una promesa que se resuelve con un objeto RusPropuestasResponse que contiene las propuestas obtenidas. 
+ * @see RusPropuestasRequest
+ * @see RusPropuestasResponse 
+*/
 export async function obtenerPropuestas(body: RusPropuestasRequest): Promise<RusPropuestasResponse> {
 
     const config = getRusConfig();
@@ -62,6 +69,13 @@ export async function obtenerPropuestas(body: RusPropuestasRequest): Promise<Rus
 /*
     * Detecta si la respuesta de RUS indica que el token es inválido o expirado.
 */
+/**
+ * Detecta si la respuesta de RUS indica que el token es inválido o expirado. 
+ * @param data La respuesta de RUS a analizar. 
+ * @returns true si la respuesta indica que el token es inválido o expirado, false en caso contrario. 
+ * @see RusPropuestasRequest
+ * @see RusPropuestasResponse 
+*/
 function esRespuestaNoAutorizada(data: unknown): boolean {
 
     if (!data || typeof data !== "object") {
@@ -79,6 +93,16 @@ function esRespuestaNoAutorizada(data: unknown): boolean {
     );
 }
 
+/**
+ * Obtiene el detalle de una propuesta específica desde RUS. 
+ * @param numeroRamo número del ramo de la propuesta. 
+ * @param numeroPropuesta número de la propuesta. 
+ * @param numeroEndoso número del endoso de la propuesta. 
+ * @param numeroRenovacion número de la renovación de la propuesta. 
+ * @returns Una promesa que se resuelve con el detalle de la propuesta obtenida desde RUS. 
+ * @see RusPropuestasRequest
+ * @see RusPropuestasResponse 
+*/
 export async function obtenerDetallePropuesta(
     numeroRamo: number,
     numeroPropuesta: number,

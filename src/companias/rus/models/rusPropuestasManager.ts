@@ -22,12 +22,22 @@ import { RusPropuesta, RusPropuestasResponse} from "./rusPropuestasInterfaces";
 
 export class RusPropuestasManager {
 
+    /**
+     * Atributos privados de la clase, que almacenan información relevante de la cartera de propuestas.
+     */
     private readonly productor: number;
     private readonly total: number;
     private readonly propuestas: RusPropuesta[];
 
     private readonly SECCION_AUTOMOTOR=4;
 
+    /**
+     * Constructor de la clase RusPropuestasManager. 
+     * Primero valida la respuesta de la API de RUS, y luego inicializa los atributos privados 
+     * con la información relevante de la cartera de propuestas.
+     * @param response La respuesta de la API de RUS que contiene las propuestas y metadatos. 
+     * @see RusPropuestasResponse para la estructura de la respuesta de la API de RUS.
+     */
     constructor(private readonly response: RusPropuestasResponse) {
     
         this.validarResponse(this.response);
@@ -37,10 +47,11 @@ export class RusPropuestasManager {
         this.productor = this.response.results[0]?.productor ?? 0;
     }
 
-    /*
-        * Valida la estructura de la respuesta.
-        * Lanza errores descriptivos si encuentra problemas.
-    */
+    /**
+     * Valida la respuesta de la API de RUS. 
+     * @param response La respuesta de la API de RUS a validar. 
+     * @see RusPropuestasResponse para la estructura de la respuesta de la API de RUS.
+     */
     private validarResponse(response: RusPropuestasResponse): void {
     
         if (!response) {
@@ -61,10 +72,11 @@ export class RusPropuestasManager {
     }
 
     /**
-     * Obtiene propuestas próximas a renovar.
-     *
-     * Internamente utiliza la fecha de fin de vigencia.
-     */
+     * Obtiene propuestas que vencen dentro de X días. 
+     * @param dias el número de días para filtrar las propuestas próximas a vencer. Debe ser un número mayor o igual a 0.   
+     * @returns un array de propuestas que vencen dentro de los días especificados. 
+     * @see RusPropuesta para la estructura de cada propuesta.    
+    */
     getProximasARenovar(dias: number): RusPropuesta[] {
     
         if (!Number.isFinite(dias) || dias < 0) {
@@ -75,7 +87,9 @@ export class RusPropuestasManager {
     }
 
     /**
-     * Obtiene únicamente propuestas de flotas.
+     * Obtiene propuestas de flotas. 
+     * @returns un array de propuestas que son flotas. 
+     * @see RusPropuesta para la estructura de cada propuesta.    
     */
     getFlotas(): RusPropuesta[] {
 
@@ -83,7 +97,10 @@ export class RusPropuestasManager {
     }
 
     /**
-     * Obtiene true si es flota
+     * Determina si una propuesta es de flota.
+     * @param propuesta La propuesta a evaluar.
+     * @returns true si la propuesta es de flota, false en caso contrario.
+     * @see RusPropuesta para la estructura de cada propuesta.    
     */
     esFlota(propuesta:RusPropuesta) : boolean {
         
@@ -91,16 +108,21 @@ export class RusPropuestasManager {
     }
 
     /**
-     * Obtiene propuestas con premio positivo.
-     */
+     * Obtiene propuestas con premio positivo. 
+     * @returns un array de propuestas cuyo premio es mayor a 0. 
+     * @see RusPropuesta para la estructura de cada propuesta.    
+    */
     getConPremioPositivo(): RusPropuesta[] {
 
         return this.propuestas.filter(p => p.premio > 0);
     }
 
     /**
-     * Obtiene propuestas cuya prima supera el monto indicado.
-     */
+     * Obtiene propuestas con premio mayor o igual a un valor mínimo. 
+     * @param premioMinimo el valor mínimo de premio para filtrar las propuestas. Debe ser un número mayor o igual a 0.   
+     * @returns un array de propuestas cuyo premio es mayor o igual al valor especificado. 
+     * @see RusPropuesta para la estructura de cada propuesta.    
+    */
     getConPremioMayorA(premioMinimo: number): RusPropuesta[] {
     
         if (premioMinimo < 0) {
@@ -111,19 +133,21 @@ export class RusPropuestasManager {
     }
 
     /**
-     * Obtiene riesgos relevantes para gestión comercial.
-     *
-     * - Flotas
-     * - Primas superiores al importe indicado
-     */
+     * Obtiene propuestas que son flotas o tienen premio mayor o igual a un valor mínimo. 
+     * @param premioMinimo el valor mínimo de premio para filtrar las propuestas. Debe ser un número mayor o igual a 0. 
+     * @returns un array de propuestas que son flotas o cuyo premio es mayor o igual al valor especificado. 
+     * @see RusPropuesta para la estructura de cada propuesta.    
+    */
     private getRiesgosRelevantes(premioMinimo: number = 5000000): RusPropuesta[] {
 
         return this.propuestas.filter(p => p.esFlota || p.premio >= premioMinimo);
     }
 
     /**
-     * Resumen comercial de la cartera.
-     */
+     * Devuelve un resumen comercial de la cartera. 
+     * @returns un objeto con la cantidad de flotas, riesgos mayores y riesgos relevantes. 
+     * @see RusPropuesta para la estructura de cada propuesta.    
+    */
     getResumenComercial() {
 
         return {
@@ -137,8 +161,10 @@ export class RusPropuestasManager {
     }
 
     /**
-    * Devuelve un resumen simplificado
-    * de las pólizas próximas a renovar.
+     * Devuelve un resumen de las renovaciones próximas a vencer. 
+     * @param dias el número de días para filtrar las propuestas próximas a vencer. Debe ser un número mayor o igual a 0. 
+     * @returns un array de objetos con la información resumida de las propuestas próximas a vencer. 
+     * @see RusPropuesta para la estructura de cada propuesta.    
     */
     getResumenRenovaciones(dias: number) {
 
@@ -160,9 +186,10 @@ export class RusPropuestasManager {
     }
 
     /**
-     * * Obtiene la cantidad de días para el vencimiento de una propuesta.
-     * * Devuelve null si no se encuentra la propuesta.
-     * * Calcula la diferencia entre la fecha de fin de vigencia y la fecha actual.
+     * Calcula la cantidad de días que faltan para el vencimiento de una propuesta según su número de póliza. 
+     * @param numeroPoliza el número de póliza de la propuesta a evaluar. Debe ser un número mayor a 0. 
+     * @returns la cantidad de días que faltan para el vencimiento de la propuesta. Si la propuesta no se encuentra, retorna null. 
+     * @see RusPropuesta para la estructura de cada propuesta.    
     */
     getDiasParaVencimiento(numeroPoliza:number): number | null {
 
@@ -186,44 +213,57 @@ export class RusPropuestasManager {
     }
 
     /**
-     * Devuelve la respuesta completa.
-     */
+     * Devuelve la respuesta completa de la API de RUS. 
+     * @returns la respuesta completa de la API de RUS que contiene las propuestas y metadatos. 
+     * @see RusPropuesta para la estructura de cada propuesta.    
+    */
     getResponse(): RusPropuestasResponse 
     {
         return this.response;
     }
 
     /**
-     * Devuelve todas las propuestas.
-     */
+     * Devuelve la lista de propuestas obtenidas de la API de RUS. 
+     * @returns un array de propuestas obtenidas de la API de RUS. 
+     * @see RusPropuesta para la estructura de cada propuesta.    
+    */
     getPropuestas(): RusPropuesta[] {
         return this.propuestas;
     }
 
     /**
-     * Devuelve el código del productor.
-     */
+     * Devuelve el código de productor de la cartera. 
+     * @returns el código de productor de la cartera. 
+     * @see RusPropuesta para la estructura de cada propuesta.    
+    */
     getProductor(): number {
         return this.productor;
     }
 
     /**
-     * Devuelve la cantidad total.
-     */
+     *  Devuelve la cantidad total de propuestas obtenidas de la API de RUS. 
+     * @returns la cantidad total de propuestas obtenidas de la API de RUS. 
+     * @see RusPropuesta para la estructura de cada propuesta.    
+    */
     getCantidad(): number {
         return this.total;
     }
 
     /**
-     * Devuelve la información de paginado.
-     */
+     * Devuelve la información de paginación de la respuesta de la API de RUS. 
+     * @returns un objeto con la información de paginación de la respuesta de la API de RUS. 
+     * @see RusPropuesta para la estructura de cada propuesta.    
+    */
     getPaging() {
         return this.response.paging;
     }
 
     /**
-     * Busca una propuesta por número de póliza.
-     */
+     * Busca una propuesta por número de póliza.   
+     * @param numeroPoliza el número de póliza de la propuesta a buscar. Debe ser un número mayor a 0. 
+     * @returns la propuesta encontrada o undefined si no se encuentra ninguna propuesta con el número de póliza especificado. 
+     * @see RusPropuesta para la estructura de cada propuesta.    
+    */
     getPropuesta(numeroPoliza: number): RusPropuesta | undefined {
         if (!Number.isFinite(numeroPoliza) || numeroPoliza <= 0 ) 
         {
@@ -234,8 +274,11 @@ export class RusPropuestasManager {
     }
 
     /**
-     * Busca propuestas por documento.
-     */
+     * Busca propuestas por número de documento. 
+     * @param documento el número de documento de la persona titular de la propuesta. Debe ser un número mayor a 0. 
+     * @returns un array de propuestas cuyo titular tiene el número de documento especificado. 
+     * @see RusPropuesta para la estructura de cada propuesta.    
+    */
     getPropuestasPorDocumento(documento: number): RusPropuesta[] {
 
         if (documento <= 0) {
@@ -246,8 +289,11 @@ export class RusPropuestasManager {
     }
 
     /**
-     * Busca propuestas por nombre.
-     */
+     * Busca propuestas por nombre de persona. 
+     * @param nombre el nombre de la persona titular de la propuesta. Debe ser un string no vacío. 
+     * @returns un array de propuestas cuyo titular tiene un nombre que contiene el string especificado (case insensitive). 
+     * @see RusPropuesta para la estructura de cada propuesta.    
+    */
     getPropuestasPorNombre(nombre: string): RusPropuesta[] {
 
         if (!nombre?.trim()) {
@@ -266,8 +312,11 @@ export class RusPropuestasManager {
     }
 
     /**
-     * Busca propuestas por cobertura.
-     */
+     * Busca propuestas por cobertura. 
+     * @param cobertura el nombre de la cobertura de la propuesta. Debe ser un string no vacío. 
+     * @returns un array de propuestas cuya cobertura contiene el string especificado (case insensitive). 
+     * @see RusPropuesta para la estructura de cada propuesta.    
+    */
     getPropuestasPorCobertura(cobertura: string): RusPropuesta[] {
 
         if (!cobertura?.trim()) {
@@ -285,12 +334,12 @@ export class RusPropuestasManager {
         );
     }
 
-
-
-
     /**
-     * Busca propuestas por sección.
-     */
+     * Busca propuestas por número de sección. 
+     * @param numeroSeccion el número de sección de la propuesta. Debe ser un número mayor a 0. 
+     * @returns un array de propuestas cuyo número de sección es igual al especificado. 
+     * @see RusPropuesta para la estructura de cada propuesta.    
+    */
     getPropuestasPorSeccion(numeroSeccion: number): RusPropuesta[] {
 
         if (numeroSeccion <= 0) {
@@ -299,10 +348,12 @@ export class RusPropuestasManager {
 
         return this.propuestas.filter(p => p.numeroSeccion === numeroSeccion);
     }
-
+    
     /**
-     * Obtiene propuestas vigentes.
-     */
+     * Obtiene propuestas vigentes. 
+     * @returns Retorna un array de propuestas cuyo estado de vigencia es "VIGENTE". 
+     * @see RusPropuesta para la estructura de cada propuesta.    
+    */
     getVigentes(): RusPropuesta[] {
 
         return this.propuestas.filter(
@@ -314,8 +365,10 @@ export class RusPropuestasManager {
     }
 
     /**
-     * Obtiene propuestas vencidas.
-     */
+     * Obtiene propuestas vencidas. 
+     * @returns Retorna un array de propuestas cuya fecha de fin de vigencia es menor a la fecha actual. 
+     * @see RusPropuesta para la estructura de cada propuesta.    
+    */
     getVencidas(): RusPropuesta[] {
 
         const hoy = new Date();
@@ -324,8 +377,11 @@ export class RusPropuestasManager {
     }
 
     /**
-     * Obtiene propuestas que vencen dentro de X días.
-     */
+     * Obtiene propuestas que vencen dentro de X días. 
+     * @param dias el número de días para filtrar las propuestas próximas a vencer. Debe ser un número mayor o igual a 0.   
+     * @returns un array de propuestas que vencen dentro de los días especificados. 
+     * @see RusPropuesta para la estructura de cada propuesta.    
+    */
     getQueVencenEn(dias: number): RusPropuesta[] {
 
         if (!Number.isFinite(dias) || dias < 0) {
@@ -349,8 +405,10 @@ export class RusPropuestasManager {
     }
 
     /**
-     * Obtiene renovaciones.
-     */
+     * Obtiene propuestas de renovación. 
+     * @returns un array de propuestas cuya propiedad "renovacion" es mayor a 0. 
+     * @see RusPropuesta para la estructura de cada propuesta.    
+    */
     getRenovaciones(): RusPropuesta[] {
 
         return this.propuestas.filter(
@@ -359,8 +417,10 @@ export class RusPropuestasManager {
     }
 
     /**
-     * Obtiene propuestas nuevas.
-     */
+     * Obtiene propuestas nuevas. 
+     * @returns un array de propuestas cuya propiedad "renovacion" es igual a 0. 
+     * @see RusPropuesta para la estructura de cada propuesta.    
+    */
     getNuevas(): RusPropuesta[] {
 
         return this.propuestas.filter(
@@ -369,8 +429,10 @@ export class RusPropuestasManager {
     }
 
     /**
-     * Premio total de la cartera.
-     */
+     * Calcula el premio total de la cartera. 
+     * @returns el premio total de la cartera, sumando el premio de todas las propuestas. 
+     * @see RusPropuesta para la estructura de cada propuesta.    
+    */
     getPremioTotal(): number {
 
         return this.propuestas.reduce(
@@ -381,8 +443,10 @@ export class RusPropuestasManager {
     }
 
     /**
-     * Cuota total de la cartera.
-     */
+     * Calcula la cuota total de la cartera. 
+     * @returns la cuota total de la cartera, sumando la cuota de todas las propuestas. 
+     * @see RusPropuesta para la estructura de cada propuesta.    
+    */
     getCuotaTotal(): number {
 
         return this.propuestas.reduce(
@@ -393,7 +457,10 @@ export class RusPropuestasManager {
     }
 
     /**
-     * Premio promedio.
+     * Calcula el premio promedio de la cartera. 
+     * @returns el premio promedio de la cartera, dividiendo el premio total entre la cantidad de propuestas. 
+     * @see RusPropuesta para la estructura de cada propuesta.*  Si no 
+     * hay propuestas, retorna 0. 
      */
     getPremioPromedio(): number {
 
@@ -407,8 +474,10 @@ export class RusPropuestasManager {
     }
 
     /**
-     * Agrupa por sección.
-     */
+     * Calcula la cantidad de propuestas por número de sección. 
+     * @returns un objeto donde las claves son los números de sección y los valores son la cantidad de propuestas en cada sección. 
+     * @see RusPropuesta para la estructura de cada propuesta.    
+    */
     getCantidadPorSeccion(): Record<number, number> {
 
         return this.propuestas.reduce(
@@ -426,8 +495,10 @@ export class RusPropuestasManager {
     }
 
     /**
-     * Ordena por vencimiento.
-     */
+     * Ordena las propuestas por fecha de vencimiento, de la más próxima a la más lejana. 
+     * @returns un array de propuestas ordenadas por fecha de vencimiento. 
+     * @see RusPropuesta para la estructura de cada propuesta.    
+    */
     ordenarPorVencimiento(): RusPropuesta[] {
 
         return [...this.propuestas]
@@ -440,8 +511,10 @@ export class RusPropuestasManager {
     }
 
     /**
-     * Ordena por premio.
-     */
+     * Ordena las propuestas por premio, de mayor a menor. 
+     * @returns un array de propuestas ordenadas por premio. 
+     * @see RusPropuesta para la estructura de cada propuesta.    
+    */
     ordenarPorPremio(): RusPropuesta[] {
 
         return [...this.propuestas]
@@ -452,8 +525,10 @@ export class RusPropuestasManager {
     }
 
     /**
-     * Ordena por nombre.
-     */
+     * Ordena las propuestas por nombre de persona, de la A a la Z. 
+     * @returns un array de propuestas ordenadas por nombre de persona. 
+     * @see RusPropuesta para la estructura de cada propuesta.    
+    */
     ordenarPorNombre(): RusPropuesta[] {
 
         return [...this.propuestas]
@@ -466,7 +541,10 @@ export class RusPropuestasManager {
     }
 
     /**
-     * Devuelve un resumen de la cartera.
+     * Devuelve un resumen de la cartera de propuestas. 
+     * @returns un objeto con el productor, total de propuestas, cantidad de vigentes, vencidas, renovaciones,
+     *  nuevas, premio total, cuota total y riesgos relevantes. 
+     * @see RusPropuesta para la estructura de cada propuesta.*  
      */
     getResumen() {
 

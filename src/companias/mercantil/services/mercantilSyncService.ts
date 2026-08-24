@@ -23,10 +23,9 @@ export class MercantilSyncService {
 ) {}
 
     /**
-     * Sincroniza la cartera de un productor en Mercantil, detectando riesgos y transformándolos al modelo general Poliza.
-     * Si ocurre un error al procesar una póliza, se guarda el error en Firestore y se omite la póliza.
+     * Sincroniza la cartera de un productor en Mercantil, detectando riesgos y transformándolos al modelo general Poliza. 
      * @param productor productor para el cual se realizará la sincronización. 
-     * @returns un arreglo de objetos Poliza con las pólizas detectadas y sus riesgos.
+     * @returns   una promesa que resuelve en un arreglo de objetos Poliza con las pólizas detectadas.
      * @see Poliza
      * @see MercantilPolizaMapper  
      * @see MercantilRiskEngine
@@ -43,51 +42,122 @@ export class MercantilSyncService {
       for (const polizaMercantil of cartera.getPolizas()) {
   
           try {
-
-            const poliMercantil = polizaMercantil.poliza;
-            const endosoMercantil = polizaMercantil.endoso;
-
-            const detalle = await this.mercantilService.obtenerDetallePoliza(poliMercantil, endosoMercantil);
-            const bienes = await this.mercantilService.obtenerBienesPoliza(poliMercantil, endosoMercantil);
   
-            const poliza = MercantilPolizaMapper.mapear(polizaMercantil,detalle,productor,bienes);
+              const poliMercantil = polizaMercantil.poliza;
   
-            poliza.riesgos = MercantilRiskEngine.detectar(poliza,detalle,bienes);
-                
-                if (poliza.riesgos.length > 0) {
-                    resultado.push(poliza);
-                }
+              const endosoMercantil = polizaMercantil.endoso;
   
-              } catch (error) {
+  
+              const detalleActual =
+                  await this.mercantilService.obtenerDetallePoliza(
+                      poliMercantil,
+                      endosoMercantil
+                  );
 
-                const mensaje = error instanceof Error ? error.message : "Error desconocido"
-                const detalle = axios.isAxiosError(error) ? error.response?.data : undefined;
-            
-                console.warn(`Se omitió la póliza ${polizaMercantil.poliza}, endoso ${polizaMercantil.endoso}`);
-            
-                console.warn(mensaje);
-            
-                try {
-            
-                    const idError = await this.errorRepository.guardar({
-                            compania: ECompania.MERCANTIL_ANDINA,
-                            productor,
-                            poliza: polizaMercantil.poliza,
-                            endoso: polizaMercantil.endoso,
-                            servicio: "bienes",
-                            mensaje,
-                            detalle
-                        });
-            
-                    console.log(`Error guardado en Firestore con ID: ${idError}`);
-            
-                } catch (errorFirestore) {
-            
-                    console.error("No se pudo guardar el error en Firestore:");
-                    console.error(errorFirestore);
-                }
-            }
+              const bienes =
+                  await this.mercantilService.obtenerBienesPoliza(
+                      poliMercantil,
+                      endosoMercantil
+                  );
+
+              const detalleFacturacion =
+                  await this.mercantilService.obtenerUltimaFacturacion(
+                      poliMercantil,
+                      endosoMercantil
+                  );
+
+              const poliza =
+                  MercantilPolizaMapper.mapear(
+                      polizaMercantil,
+                      detalleActual,
+                      detalleFacturacion,
+                      productor,
+                      bienes
+                  );
+  
+  
+              /**
+               * RiskEngine trabaja sobre la póliza ya mapeada,
+               * por lo tanto prima/premio ya representan
+               * el importe base de la póliza.
+               */
+              poliza.riesgos =
+                  MercantilRiskEngine.detectar(
+                      poliza,
+                      detalleActual,
+                      bienes
+                  );
+  
+  
+              if (poliza.riesgos.length > 0) {
+                  resultado.push(poliza);
+              }
+  
+  
+          } catch (error) {
+  
+              const mensaje =
+                  error instanceof Error
+                      ? error.message
+                      : "Error desconocido";
+  
+              const detalle =
+                  axios.isAxiosError(error)
+                      ? error.response?.data
+                      : undefined;
+  
+  
+              console.warn(
+                  `Se omitió la póliza ` +
+                  `${polizaMercantil.poliza}, ` +
+                  `endoso ${polizaMercantil.endoso}`
+              );
+  
+              console.warn(mensaje);
+  
+  
+              try {
+  
+                  const idError =
+                      await this.errorRepository.guardar({
+  
+                          compania:
+                              ECompania.MERCANTIL_ANDINA,
+  
+                          productor,
+  
+                          poliza:
+                              polizaMercantil.poliza,
+  
+                          endoso:
+                              polizaMercantil.endoso,
+  
+                          servicio:
+                              "sincronizacion-poliza",
+  
+                          mensaje,
+  
+                          detalle
+                      });
+  
+  
+                  console.log(
+                      `Error guardado en Firestore ` +
+                      `con ID: ${idError}`
+                  );
+  
+  
+              } catch (errorFirestore) {
+  
+                  console.error(
+                      "No se pudo guardar el error en Firestore:"
+                  );
+  
+                  console.error(errorFirestore);
+              }
+          }
       }
+  
   
       return resultado;
   }

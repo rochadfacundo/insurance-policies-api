@@ -13,7 +13,7 @@ export interface MercantilDetallePoliza {
     emitido: string;
 
     bien: string;
-
+    tipo:string;
     suma: number;
 
     cobertura: string;

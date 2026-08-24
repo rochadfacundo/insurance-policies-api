@@ -90,12 +90,11 @@ export class RusSyncService {
 
 
         //debug premios
-        const propuestasConPremioMayor = [...propuestasVigentes]
-                .sort((a, b) => Number(b.premio ?? 0) - Number(a.premio ?? 0)).slice(0, 10);
+        const propuestasConPremioMayor = [...propuestasVigentes].sort((a, b) =>
+            Number(b.premioPoliza ?? b.premio ?? 0) - Number(a.premioPoliza ?? a.premio ?? 0)).slice(0, 10);
 
         const posiblesFlotas = propuestasVigentes.filter(propuesta =>
-                propuesta.numeroSeccion === 4 || propuesta.esFlota === true || Number(propuesta.cantidadVehiculos ?? 0) > 1
-                );
+                propuesta.numeroSeccion === 4 || propuesta.esFlota === true || Number(propuesta.cantidadVehiculos ?? 0) > 1);
 
         console.log("");
         console.log("==================================================");
@@ -108,16 +107,18 @@ export class RusSyncService {
             console.log("No hay propuestas vigentes para diagnosticar.");
         } else {
             console.log("Premio máximo:", {
-                premio: propuestasConPremioMayor[0]?.premio ?? 0,
+                premioPoliza: propuestasConPremioMayor[0]?.premioPoliza ?? propuestasConPremioMayor[0]?.premio ??  0,
+                premioEndoso: propuestasConPremioMayor[0]?.premio ?? 0,
                 poliza: propuestasConPremioMayor[0]?.numeroPoliza,
-                cliente:propuestasConPremioMayor[0]?.nombrePersona?.trim() || propuestasConPremioMayor[0]?.razonSocial?.trim()
+                cliente: propuestasConPremioMayor[0]?.nombrePersona?.trim() || propuestasConPremioMayor[0]?.razonSocial?.trim()
             });
         
             console.table(propuestasConPremioMayor.map(propuesta => ({
                     poliza: propuesta.numeroPoliza,
                     cliente: propuesta.nombrePersona?.trim() || propuesta.razonSocial?.trim(),
                     seccion: propuesta.numeroSeccion,
-                    premio: propuesta.premio,
+                    premioPoliza: propuesta.premioPoliza ?? propuesta.premio,
+                    premioEndoso: propuesta.premio,
                     esFlota: propuesta.esFlota,
                     cantidadVehiculos: propuesta.cantidadVehiculos
             })));
@@ -134,10 +135,9 @@ export class RusSyncService {
                         descripcionSeccion: propuesta.seccion,
                         esFlota: propuesta.esFlota,
                         cantidadVehiculos: propuesta.cantidadVehiculos,
-                        premio: propuesta.premio
-                    })
-                )
-            );
+                        premioPoliza: propuesta.premioPoliza ?? propuesta.premio,
+                        premioEndoso: propuesta.premio
+                    })));
         }
 
         //fin debug

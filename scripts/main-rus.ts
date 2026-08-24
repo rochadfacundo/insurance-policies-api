@@ -1,10 +1,9 @@
 import "dotenv/config";
-
 import { Productor } from "../src/models/productor";
 import { RusSyncService } from "../src/companias/rus/services/rusSyncService";
 import { FirestorePolizaRepository } from "../src/repositories/firestorePolizaRepository";
 import { ECompania } from "../src/models/eCompania";
-import { obtenerProductoresRUS1 } from "../src/companias/rus/productoresRUS";
+import { obtenerProductoresRUS } from "../src/companias/rus/productoresRUS";
 import { ModoSincronizacionRus } from "../src/companias/rus/models/modoSincronizacionRus";
 import { formatearDuracion, formatearFecha, restarDias } from "../src/utils/utils";
 import { ErrorProductor } from "../src/models/errorProductor";
@@ -12,17 +11,7 @@ import { FirestoreRusSyncStateRepository } from "../src/companias/rus/repositori
 import { EstadoSincronizacionRus, RusSyncState } from "../src/companias/rus/models/rusSyncState";
 
 
-/**
- * Rango de productores a procesar.
- *
- * slice(desde, hasta)
- *
- * Lote 1 -> 0,5
- * Lote 2 -> 5,10
- * Lote 3 -> 10,15
- */
-const INDICE_DESDE = 0;
-const INDICE_HASTA = 15;    
+
 
 /**
  * Habilita o deshabilita la reconciliación en Firestore.
@@ -33,25 +22,26 @@ const ESCRIBIR_FIRESTORE = true;
 /**
  * Habilita o deshabilita la reconstrucción completa de la cartera.
  */
-const FORZAR_BOOTSTRAP = true;
+const FORZAR_BOOTSTRAP = false;
 
 /**
  * Rango utilizado para reconstruir la cartera.
  * Debe cubrir todas las pólizas que todavía podrían estar vigentes.
  */
-const FECHA_DESDE = "2025-08-06";
-const FECHA_HASTA = "2026-08-06";
-
+const FECHA_DESDE = "2025-08-24";
+const FECHA_HASTA = formatearFecha(new Date());
 
 async function main(): Promise<void> {
 
     const inicioGeneral = Date.now();
+    
 
-    const productores: Productor[] = obtenerProductoresRUS1().slice(INDICE_DESDE, INDICE_HASTA)
-        .map(productor => ({
+    const productores: Productor[] = obtenerProductoresRUS().map(productor => ({
             codigo: productor.codigo,
             nombre: productor.nombre.trim(),
             estado_id: productor.estado_id }));
+
+    console.log(`Se encontraron ${productores.length} productores activos para procesar.`);
 
     if (productores.length === 0) {
         console.log("No se encontraron productores activos para procesar.");
@@ -91,6 +81,7 @@ async function main(): Promise<void> {
     for (let indice = 0;  indice < productores.length; indice++) {
 
         const productor = productores[indice];
+        
 
         const inicioProductor = Date.now();
 

@@ -45,3 +45,4 @@ export async function obtenerDetallePoliza(poliza: number, endoso: number): Prom
 
     return response.data;
 }
+

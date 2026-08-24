@@ -77,6 +77,19 @@ export class MercantilDetallePolizaManager {
         return this.detalle.costo.premio;
     }
 
+    /**
+     * Obtiene el tipo de movimiento correspondiente al detalle de la póliza.
+     *
+     * Mercantil utiliza este campo para distinguir, entre otros, la emisión
+     * inicial ("NUEVA"), los movimientos de facturación ("FACTURACION") y
+     * los endosos que modifican la póliza ("ENDOSO").
+     *
+     * @returns Tipo de movimiento informado por Mercantil.
+     */
+    getTipo(): string {
+        return this.detalle.tipo;
+    }
+
     /*
         * Devuelve la prima total de la póliza.
         * Útil para determinar el costo total de la póliza.

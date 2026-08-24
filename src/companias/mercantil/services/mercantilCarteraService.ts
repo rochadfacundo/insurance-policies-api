@@ -161,4 +161,94 @@ export class MercantilCarteraService {
 
         return Array.from(map.values());
     }
+
+    /**
+     * Obtiene el detalle económico representativo de una póliza de Mercantil Andina.
+     *
+     * Mercantil puede informar como endoso actual un movimiento que no representa
+     * la facturación normal de la póliza. Por ejemplo, un endoso de inclusión o
+     * exclusión de vehículo puede contener una prima y un premio correspondientes
+     * únicamente al ajuste generado por ese movimiento.
+     *
+     * Por este motivo, no se debe utilizar necesariamente la prima y el premio del
+     * endoso actual como valores representativos de la póliza.
+     *
+     * El método recorre los endosos desde el endoso actual hacia atrás hasta
+     * encontrar el último detalle cuyo tipo sea "FACTURACION".
+     *
+     * Ejemplo:
+     *
+     * Endoso 7 -> ENDOSO      -> inclusión/exclusión de vehículo
+     * Endoso 6 -> FACTURACION -> se utiliza para prima/premio
+     *
+     * De esta manera:
+     * - el endoso actual continúa representando el estado vigente de la póliza;
+     * - la cobertura y los bienes pueden obtenerse del endoso actual;
+     * - la prima y el premio se obtienen de la última facturación disponible.
+     *
+     * El endoso 0 corresponde a la emisión inicial de la póliza ("NUEVA").
+     * Si no existe ningún endoso de tipo "FACTURACION" entre el endoso actual
+     * y el endoso 1, se utiliza el detalle del endoso 0 como fallback. Esto
+     * contempla pólizas nuevas que todavía no poseen una facturación posterior.
+     *
+     * Los importes de los distintos endosos NO se suman, ya que los endosos de
+     * tipo FACTURACION pueden corresponder a períodos de facturación diferentes
+     * y los endosos comunes pueden representar únicamente ajustes económicos.
+     *
+     * @param poliza Número de póliza de Mercantil Andina.
+     * @param endosoActual Número del endoso vigente informado por la cartera.
+     * @returns El detalle correspondiente a la última facturación disponible,
+     * o el detalle del endoso 0 cuando todavía no existe una facturación posterior.
+     * @throws Error si no es posible obtener ningún detalle válido para utilizar
+     * como referencia económica.
+     */
+    async obtenerUltimaFacturacion(poliza: number,endosoActual: number): Promise<MercantilDetallePolizaManager> {
+
+        let detalleEndosoCero: MercantilDetallePolizaManager | null = null;
+
+        for (let endoso = endosoActual; endoso >= 0; endoso--) {
+
+            try {
+
+                const detalle = await this.obtenerDetallePoliza(
+                    poliza,
+                    endoso
+                );
+
+                const tipo = detalle.getTipo()?.trim().toUpperCase();
+
+                if (tipo === "FACTURACION") {
+                    return detalle;
+                }
+
+                if (endoso === 0) {
+                    detalleEndosoCero = detalle;
+                }
+
+            } catch (error) {
+
+                console.warn(
+                    `No se pudo consultar el detalle de la póliza ${poliza}, ` +
+                    `endoso ${endoso}, al buscar la última facturación.`
+                );
+
+                /*
+                * Continuamos hacia atrás porque la ausencia o error de un
+                * endoso intermedio no implica necesariamente que no exista
+                * una facturación anterior válida.
+                */
+                continue;
+            }
+        }
+
+        if (detalleEndosoCero) {
+            return detalleEndosoCero;
+        }
+
+        throw new Error(
+            `No se encontró una facturación ni un endoso 0 válido ` +
+            `para la póliza ${poliza}.`
+        );
+    }
+
 }

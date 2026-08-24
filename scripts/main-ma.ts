@@ -70,8 +70,8 @@ async function main(): Promise<void> {
         const inicioProductor = Date.now();
 
         
-        if(productor==null || productor==undefined){
-            return;
+        if (productor == null) {
+            continue;
         }
 
         console.log("");

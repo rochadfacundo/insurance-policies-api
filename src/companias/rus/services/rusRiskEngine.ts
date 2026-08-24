@@ -56,12 +56,13 @@ export class RusRiskEngine {
     /**
      * Detecta si una propuesta de RUS corresponde a un riesgo de premio alto. 
      * @param propuesta La propuesta de RUS a evaluar. 
-     * @returns true si la propuesta corresponde a un riesgo de premio alto, false en caso contrario. 
-     * @see TipoRiesgo
-     * @see RusPropuesta 
-    */
+     * @returns true si la propuesta corresponde a un riesgo de premio alto, false en caso contrario.
+     * @see TipoRiesgo 
+     */
     private static esPremioAlto(propuesta: RusPropuesta): boolean {
 
-        return ( Number.isFinite(propuesta.premio) && propuesta.premio >= this.PREMIO_ALTO_MINIMO);
+        const premio = Number(propuesta.premioPoliza ?? propuesta.premio ?? 0);
+    
+        return (Number.isFinite(premio) && premio >= this.PREMIO_ALTO_MINIMO);
     }
 }

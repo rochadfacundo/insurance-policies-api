@@ -31,7 +31,7 @@ export interface RusPropuesta {
     fechaEmision: string;
     inicioVigencia: string;
     finVigencia: string;
-
+    premioPoliza: number;
     inicioPeriodoFacturacion: string;
     finPeriodoFacturacion: string;
 

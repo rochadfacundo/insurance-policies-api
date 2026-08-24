@@ -46,7 +46,9 @@ export class RusPolizaMapper {
             },
             riesgo: {
                 cobertura: propuesta.cobertura?.trim() || propuesta.interesAsegurable?.trim() || "SIN COBERTURA INFORMADA",
-                premio: propuesta.premio,
+                // Si premioPoliza es nulo, se utiliza el premio de la propuesta. 
+                // Esto es para manejar casos donde RUS no informa el premio de la póliza.
+                premio: propuesta.premioPoliza ?? propuesta.premio,
                 // RUS no informa prima separada en este modelo.
                 prima: 0
             },

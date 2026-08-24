@@ -153,7 +153,7 @@ export class RusCarteraService {
             propuestas.push(...manager.getPropuestas());
         }
 
-        const propuestasSinDuplicados = this.eliminarDuplicados(propuestas);
+        const propuestasSinDuplicados = await this.consolidarPropuestas(propuestas);
 
         return this.crearManagerDesdePropuestas(propuestasSinDuplicados);
     }
@@ -354,7 +354,7 @@ export class RusCarteraService {
         //debug trazo4
         const inicioDuplicados = Date.now();
     
-        const propuestasSinDuplicados = this.eliminarDuplicados(propuestasAcumuladas);
+        const propuestasSinDuplicados = await this.consolidarPropuestas(propuestasAcumuladas);
 
         //debug trazo5
         const duracionEliminarDuplicados = Date.now() - inicioDuplicados;
@@ -565,27 +565,218 @@ export class RusCarteraService {
     
 
     /**
-     * Elimina propuestas duplicadas de un array de propuestas. 
-     * @param propuestas array de propuestas del cual se desea eliminar duplicados. 
-     * @returns Un array de propuestas sin duplicados, 
-     *  * @see RusPropuestasManagerdonde 
-     * se considera duplicado a una propuesta con el mismo número de póliza o el mismo ID. 
+     * Elimina duplicados de un array de propuestas, 
+     * conservando la propuesta vigente o la de mayor endoso en caso de existir duplicados.
+     * @param propuestas array de propuestas a consolidar.
+     * @returns Un array de propuestas sin duplicados, conservando la propuesta vigente 
+     * o la de mayor endoso en caso de existir duplicados.
+     * @see RusPropuesta
      */
-    private eliminarDuplicados(propuestas: RusPropuesta[]): RusPropuesta[] {
-
-        const map = new Map<string, RusPropuesta>();
-
+    private async consolidarPropuestas(
+        propuestas: RusPropuesta[]
+    ): Promise<RusPropuesta[]> {
+    
+        const grupos = new Map<string, RusPropuesta[]>();
+    
+        /**
+         * Agrupamos todas las apariciones de una misma póliza.
+         */
         for (const propuesta of propuestas) {
-
+    
             const key =
                 propuesta.numeroPoliza
                     ? `poliza-${propuesta.numeroPoliza}`
                     : `id-${propuesta.id}`;
-
-            map.set(key, propuesta);
+    
+            const grupo = grupos.get(key) ?? [];
+    
+            grupo.push(propuesta);
+    
+            grupos.set(key, grupo);
         }
-
-        return Array.from(map.values());
+    
+    
+        const propuestasConsolidadas: RusPropuesta[] = [];
+    
+    
+        for (const grupo of grupos.values()) {
+    
+            if (grupo.length === 0) {
+                continue;
+            }
+    
+    
+            /**
+             * Preferimos siempre el registro que RUS marca
+             * actualmente como VIGENTE.
+             */
+            const vigente = grupo.find(
+                propuesta =>
+                    propuesta.vigenciaEstado
+                        ?.trim()
+                        .toUpperCase() === "VIGENTE"
+            );
+    
+    
+            /**
+             * Si no existe uno marcado como vigente,
+             * utilizamos el de mayor endoso.
+             */
+            const mayorEndoso = [...grupo]
+                .sort(
+                    (a, b) =>
+                        Number(b.endoso ?? 0) -
+                        Number(a.endoso ?? 0)
+                )[0]!;
+    
+    
+            const actual: RusPropuesta =
+                vigente ?? mayorEndoso;
+    
+    
+            /**
+             * Primero intentamos encontrar el endoso 0
+             * dentro del propio rango consultado.
+             *
+             * Esto ocurre normalmente durante un BOOTSTRAP.
+             */
+            const endosoInicial = grupo.find(
+                propuesta =>
+                    Number(propuesta.endoso ?? 0) === 0
+            );
+    
+    
+            let premioPoliza: number | undefined;
+    
+    
+            /**
+             * CASO 1
+             *
+             * Tenemos el endoso 0 dentro de la cartera.
+             */
+            if (endosoInicial) {
+    
+                const premioInicial =
+                    Number(endosoInicial.premio ?? 0);
+    
+                if (
+                    Number.isFinite(premioInicial) &&
+                    premioInicial > 0
+                ) {
+                    premioPoliza = premioInicial;
+                }
+            }
+    
+    
+            /**
+             * CASO 2
+             *
+             * No tenemos el endoso 0.
+             *
+             * Esto es justamente lo que puede ocurrir durante
+             * una sincronización INCREMENTAL.
+             *
+             * Como conocemos:
+             *
+             * - sección
+             * - propuesta
+             * - renovación
+             *
+             * podemos pedir directamente a RUS el detalle
+             * del endoso 0.
+             */
+            if (
+                premioPoliza === undefined &&
+                Number(actual.endoso ?? 0) > 0
+            ) {
+    
+                try {
+    
+                    console.log(
+                        `Recuperando endoso inicial RUS: ` +
+                        `póliza ${actual.numeroPoliza}, ` +
+                        `endoso actual ${actual.endoso}`
+                    );
+    
+    
+                    const detalleInicial =
+                        await obtenerDetallePropuesta(
+                            actual.numeroSeccion,
+                            actual.propuesta,
+                            0,
+                            actual.renovacion
+                        );
+    
+    
+                    const premioInicial =
+                        Number(detalleInicial?.premio ?? 0);
+    
+    
+                    if (
+                        Number.isFinite(premioInicial) &&
+                        premioInicial > 0
+                    ) {
+    
+                        premioPoliza =
+                            premioInicial;
+    
+    
+                        console.log({
+                            poliza:
+                                actual.numeroPoliza,
+    
+                            endosoActual:
+                                actual.endoso,
+    
+                            premioEndoso:
+                                actual.premio,
+    
+                            premioPoliza
+                        });
+    
+                    } else {
+    
+                        console.warn(
+                            `RUS no informó un premio válido ` +
+                            `para el endoso inicial de la póliza ` +
+                            `${actual.numeroPoliza}.`
+                        );
+                    }
+    
+    
+                } catch (error) {
+    
+                    console.warn(
+                        `No se pudo recuperar el endoso inicial ` +
+                        `de la póliza ${actual.numeroPoliza}. ` +
+                        `Error: ${obtenerMensajeError(error)}`
+                    );
+                }
+            }
+    
+    
+            /**
+             * CASO 3
+             *
+             * Si estamos directamente sobre el endoso 0
+             * o RUS no permitió recuperar el detalle,
+             * hacemos fallback al importe disponible.
+             */
+            if (premioPoliza === undefined) {
+    
+                premioPoliza =
+                    Number(actual.premio ?? 0);
+            }
+    
+    
+            propuestasConsolidadas.push({
+                ...actual,
+                premioPoliza
+            });
+        }
+    
+    
+        return propuestasConsolidadas;
     }
 
 

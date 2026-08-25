@@ -205,4 +205,72 @@ export class MercantilDetallePolizaManager {
     getRamaId(): number {
         return this.detalle.rama.id;
     }
+
+    /**
+     * Calcula el factor necesario para anualizar los importes
+     * correspondientes al período de facturación del detalle.
+     *
+     * Mercantil puede devolver facturaciones mensuales, trimestrales,
+     * semestrales o anuales. Por este motivo no se debe asumir
+     * un multiplicador fijo de 12.
+     *
+     * El factor se obtiene a partir de la duración entre las fechas
+     * "desde" y "hasta" informadas por el detalle.
+     *
+     * Ejemplos aproximados:
+     *
+     * 1 mes   -> factor 12
+     * 3 meses -> factor 4
+     * 6 meses -> factor 2
+     * 12 meses -> factor 1
+     *
+     * @returns Factor utilizado para anualizar prima y premio.
+     */
+    getFactorAnualizacion(): number {
+
+        const desde = new Date(this.detalle.desde);
+        const hasta = new Date(this.detalle.hasta);
+    
+        const meses =
+            (hasta.getFullYear() - desde.getFullYear()) * 12 +
+            (hasta.getMonth() - desde.getMonth());
+    
+        if (meses <= 0) {
+            return 1;
+        }
+    
+        return 12 / meses;
+    }
+
+
+    /**
+     * Obtiene la prima anualizada tomando como base la prima
+     * correspondiente al período de facturación informado
+     * por Mercantil.
+     *
+     * @returns Prima anualizada.
+     */
+    getPrimaAnualizada(): number {
+
+        const prima = this.getPrima();
+
+        return prima * this.getFactorAnualizacion();
+    }
+
+
+    /**
+     * Obtiene el premio anualizado tomando como base el premio
+     * correspondiente al período de facturación informado
+     * por Mercantil.
+     *
+     * @returns Premio anualizado.
+     */
+    getPremioAnualizado(): number {
+
+        const premio = this.getPremio();
+
+        return premio * this.getFactorAnualizacion();
+    }
+
+
 }

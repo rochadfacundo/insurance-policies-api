@@ -1,8 +1,6 @@
 import "dotenv/config";
 
-import {
-    Productor
-} from "../src/models/productor";
+import { Productor } from "../src/models/productor";
 
 import {
     MercantilSyncService
@@ -13,64 +11,60 @@ import {
 } from "../src/utils/utils";
 
 
-/**
- * ============================================================
- * PRUEBA INTEGRACIÓN COMPLETA MERCANTIL ANDINA
- * ============================================================
- *
- * Objetivo:
- *
- * Validar el flujo real:
- *
- * cartera
- *   ↓
- * detalle actual
- *   ↓
- * última facturación
- *   ↓
- * bienes actuales
- *   ↓
- * mapper
- *   ↓
- * risk engine
- *
- * Para la póliza 516641066 esperamos:
- *
- * - endoso actual: 7
- * - última facturación: endoso 6
- * - prima final: 12704.30
- * - premio final: 23647.69
- *
- * NO escribe Firestore.
- */
+interface CasoPrueba {
+    productor: Productor;
+    poliza: number;
+    primaEsperada: number;
+    premioEsperado: number;
+    endosoEsperado: number;
+}
 
 
-const PRODUCTOR: Productor = {
-    codigo: 90494,
-    nombre: "MEANDRI, ANDREA RINA",
-    estado_id: 1
-};
+const CASOS: CasoPrueba[] = [
+    {
+        productor: {
+            codigo: 87077,
+            nombre: "LEDESMA, FLORENCIA BEATRIZ",
+            estado_id: 1
+        },
+        poliza: 516641066,
+        primaEsperada: 152451.6,
+        premioEsperado: 283772.28,
+        endosoEsperado: 7
+    },
+    {
+        productor: {
+            codigo: 90494,
+            nombre: "MEANDRI, ANDREA RINA",
+            estado_id: 1
+        },
+        poliza: 516416032,
+        primaEsperada: 8872906.08,
+        premioEsperado: 15656775,
+        endosoEsperado: 19
+    }
+];
 
-const POLIZA_OBJETIVO = 516416032;
 
+function sonIgualesConTolerancia(
+    valor1: number,
+    valor2: number,
+    tolerancia = 0.01
+): boolean {
 
+    return Math.abs(valor1 - valor2) <= tolerancia;
+}
 
 
 async function main(): Promise<void> {
 
-    const inicio = Date.now();
+    const inicioGeneral = Date.now();
 
 
     console.log("");
     console.log("==================================================");
-    console.log("PRUEBA INTEGRACIÓN MERCANTIL ANDINA");
+    console.log("PRUEBA ANUALIZACIÓN MERCANTIL ANDINA");
     console.log("==================================================");
-
-    console.log({
-        productor: PRODUCTOR.codigo,
-        nombre: PRODUCTOR.nombre,
-        polizaObjetivo: POLIZA_OBJETIVO
-    });
 
     console.log("");
     console.log("NO se realizarán escrituras en Firestore.");
@@ -81,173 +75,218 @@ async function main(): Promise<void> {
         new MercantilSyncService();
 
 
-    /**
-     * Ejecutamos el flujo productivo real.
-     *
-     * El servicio debería:
-     *
-     * - conservar el endoso actual;
-     * - buscar hacia atrás la última FACTURACION;
-     * - mapear prima/premio desde esa facturación;
-     * - ejecutar RiskEngine.
-     */
-    const riesgos =
-        await syncService.sincronizar(
-            PRODUCTOR
+    for (
+        let indice = 0;
+        indice < CASOS.length;
+        indice++
+    ) {
+
+        const caso = CASOS[indice];
+
+        if(!caso){
+            continue;
+        }
+
+        console.log("");
+        console.log("--------------------------------------------------");
+        console.log(
+            `[${indice + 1}/${CASOS.length}] ` +
+            `Póliza ${caso.poliza} - Productor ${caso.productor.codigo}`
         );
+        console.log("--------------------------------------------------");
 
 
-    console.log("");
-    console.log("==================================================");
-    console.log("RESULTADO GENERAL");
-    console.log("==================================================");
-
-    console.log({
-        riesgosDetectados:
-            riesgos.length
-    });
+        const inicioCaso = Date.now();
 
 
-    /**
-     * ========================================================
-     * BUSCAR PÓLIZA OBJETIVO
-     * ========================================================
-     */
-
-    const poliza =
-        riesgos.find(
-            poliza =>
-                Number(
-                    poliza.detallePoliza.numeroPoliza
-                ) === POLIZA_OBJETIVO
-        );
+        const riesgos =
+            await syncService.sincronizar(
+                caso.productor
+            );
 
 
-    console.log("");
-    console.log("==================================================");
-    console.log(
-        `PÓLIZA OBJETIVO ${POLIZA_OBJETIVO}`
-    );
-    console.log("==================================================");
+        const poliza =
+            riesgos.find(
+                poliza =>
+                    Number(
+                        poliza.detallePoliza.numeroPoliza
+                    ) === caso.poliza
+            );
 
 
-    if (!poliza) {
+        if (!poliza) {
+
+            console.log("");
+            console.log(
+                `La póliza ${caso.poliza} no apareció entre los riesgos.`
+            );
+
+            console.log(
+                "Puede haberse procesado correctamente pero no haber quedado clasificada como riesgo."
+            );
+
+            continue;
+        }
+
+
+        const primaFinal =
+            Number(poliza.riesgo.prima ?? 0);
+
+        const premioFinal =
+            Number(poliza.riesgo.premio ?? 0);
+
+        const endosoActual =
+            Number(
+                poliza.detallePoliza.endoso ?? 0
+            );
+
+
+        const primaCorrecta =
+            sonIgualesConTolerancia(
+                primaFinal,
+                caso.primaEsperada
+            );
+
+        const premioCorrecto =
+            sonIgualesConTolerancia(
+                premioFinal,
+                caso.premioEsperado
+            );
+
+        const endosoCorrecto =
+            endosoActual ===
+            caso.endosoEsperado;
+
+
+        console.log("");
+        console.log("RESULTADO FINAL:");
+
+        console.log({
+            numeroPoliza:
+                poliza.detallePoliza.numeroPoliza,
+
+            endosoActual,
+
+            cobertura:
+                poliza.riesgo.cobertura,
+
+            primaAnual:
+                primaFinal,
+
+            premioAnual:
+                premioFinal,
+
+            riesgos:
+                poliza.riesgos,
+
+            cliente:
+                poliza.cliente.nombre
+        });
+
+
+        console.log("");
+        console.log("VALIDACIONES:");
+
+        console.log({
+            endoso: {
+                esperado:
+                    caso.endosoEsperado,
+
+                obtenido:
+                    endosoActual,
+
+                correcto:
+                    endosoCorrecto
+            },
+
+            primaAnual: {
+                esperada:
+                    caso.primaEsperada,
+
+                obtenida:
+                    primaFinal,
+
+                correcta:
+                    primaCorrecta
+            },
+
+            premioAnual: {
+                esperado:
+                    caso.premioEsperado,
+
+                obtenido:
+                    premioFinal,
+
+                correcto:
+                    premioCorrecto
+            },
+
+            riesgos:
+                poliza.riesgos
+        });
+
+
+        /**
+         * Caso especial:
+         *
+         * La póliza 516416032 debería superar el umbral
+         * de PRIMA_ALTA si el RiskEngine trabaja sobre
+         * la prima anualizada.
+         */
+        if (caso.poliza === 516416032) {
+
+            const tienePrimaAlta =
+                poliza.riesgos.includes(
+                    "PRIMA_ALTA" as any
+                );
+
+
+            console.log("");
+
+            console.log("VALIDACIÓN PRIMA_ALTA:");
+
+            console.log({
+                esperado:
+                    true,
+
+                obtenido:
+                    tienePrimaAlta,
+
+                correcto:
+                    tienePrimaAlta === true
+            });
+        }
+
+
+        const pruebaCorrecta =
+            endosoCorrecto &&
+            primaCorrecta &&
+            premioCorrecto;
+
 
         console.log("");
         console.log(
-            "La póliza objetivo no apareció entre los riesgos."
+            pruebaCorrecta
+                ? "PRUEBA CORRECTA"
+                : "PRUEBA CON DIFERENCIAS"
         );
 
-        console.log("");
+
         console.log(
-            "Esto puede significar que fue procesada correctamente, " +
-            "pero MercantilRiskEngine no detectó ningún riesgo."
+            `Duración caso: ` +
+            `${formatearDuracion(Date.now() - inicioCaso)}`
         );
-
-        console.log("");
-        console.log(
-            "Si ocurre eso, debemos probar el mapper directamente " +
-            "sin pasar por RiskEngine."
-        );
-
-        return;
     }
 
 
-    /**
-     * ========================================================
-     * RESULTADO FINAL
-     * ========================================================
-     */
-
-    console.log("");
-    console.log("RESULTADO FINAL:");
-
-    console.log({
-        id:
-            poliza.id,
-
-        numeroPoliza:
-            poliza.detallePoliza.numeroPoliza,
-
-        endosoActual:
-            poliza.detallePoliza.endoso,
-
-        cobertura:
-            poliza.riesgo.cobertura,
-
-        primaFinal:
-            poliza.riesgo.prima,
-
-        premioFinal:
-            poliza.riesgo.premio,
-
-        riesgos:
-            poliza.riesgos,
-
-        cliente:
-            poliza.cliente.nombre,
-
-        vigenciaDesde:
-            poliza.vigencia.desde,
-
-        vigenciaHasta:
-            poliza.vigencia.hasta
-    });
-
-
-    console.log("");
-    console.log("Objeto Poliza completo:");
-
-    console.dir(
-        poliza,
-        {
-            depth: null,
-            colors: true
-        }
-    );
-
-    console.log("");
-console.log("==================================================");
-console.log("VALIDACIONES");
-console.log("==================================================");
-
-console.log({
-    endosoActual:
-        poliza.detallePoliza.endoso,
-
-    primaFinal:
-        poliza.riesgo.prima,
-
-    premioFinal:
-        poliza.riesgo.premio,
-
-    cobertura:
-        poliza.riesgo.cobertura,
-
-    riesgos:
-        poliza.riesgos
-});
-
-console.log("");
-console.log("==================================================");
-console.log("PRUEBA DE INTEGRACIÓN FINALIZADA");
-console.log("==================================================");
-
-
     console.log("");
     console.log("==================================================");
-
-
-
-
+    console.log("PRUEBA FINALIZADA");
     console.log("==================================================");
 
-
-    console.log("");
     console.log(
         `Duración total: ` +
-        `${formatearDuracion(Date.now() - inicio)}`
+        `${formatearDuracion(Date.now() - inicioGeneral)}`
     );
 }
 

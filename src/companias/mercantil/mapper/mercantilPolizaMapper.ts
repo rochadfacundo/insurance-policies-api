@@ -55,9 +55,8 @@ export class MercantilPolizaMapper {
                  * usamos el detalle del endoso vigente.
                  */
                 cobertura: detalleActual.getCobertura(),
-    
-                premio: detalleFacturacion.getPremio(),
-                prima: detalleFacturacion.getPrima()
+                premio: detalleFacturacion.getPremioAnualizado(),
+                prima: detalleFacturacion.getPrimaAnualizada()
             },
     
             riesgos: [],

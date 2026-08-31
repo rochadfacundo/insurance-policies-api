@@ -35,7 +35,7 @@ export class MercantilPolizaMapper {
     
             productor: {
                 codigo: productor.codigo,
-    
+                matricula: productor.matricula,
                 nombre: productor.nombre
             },
     

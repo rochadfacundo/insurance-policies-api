@@ -40,7 +40,13 @@ async function main(): Promise<void> {
      * Procesamos solamente productores activos.
         * Para pruebas, se puede filtrar por código de productor.
     */
-    const productores = obtenerProductoresMercantil().filter(productor => productor.estado_id === 1);
+    //const productores = obtenerProductoresMercantil().filter(productor => productor.estado_id === 1);
+    const productores =
+    obtenerProductoresMercantil()
+        .filter(
+            productor =>
+                productor.codigo === 87692
+        );
 
 
     const erroresProductores: ErrorProductor[] = [];

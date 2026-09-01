@@ -3,21 +3,17 @@ import { Productor } from "../src/models/productor";
 import { RusSyncService } from "../src/companias/rus/services/rusSyncService";
 import { FirestorePolizaRepository } from "../src/repositories/firestorePolizaRepository";
 import { ECompania } from "../src/models/eCompania";
-import { obtenerProductoresRUS } from "../src/companias/rus/productoresRUS";
+import { obtenerProductoresRUS, ProductorRUS } from "../src/companias/rus/productoresRUS";
 import { ModoSincronizacionRus } from "../src/companias/rus/models/modoSincronizacionRus";
 import { formatearDuracion, formatearFecha, restarDias } from "../src/utils/utils";
 import { ErrorProductor } from "../src/models/errorProductor";
 import { FirestoreRusSyncStateRepository } from "../src/companias/rus/repositories/firestoreRusSyncStateRepository";
 import { EstadoSincronizacionRus, RusSyncState } from "../src/companias/rus/models/rusSyncState";
 
-
-
-
 /**
  * Habilita o deshabilita la reconciliación en Firestore.
  */
 const ESCRIBIR_FIRESTORE = true;
-
 
 /**
  * Habilita o deshabilita la reconstrucción completa de la cartera.
@@ -26,20 +22,16 @@ const FORZAR_BOOTSTRAP = false;
 
 /**
  * Rango utilizado para reconstruir la cartera.
- * Debe cubrir todas las pólizas que todavía podrían estar vigentes.
+ * Cubre el último año desde la fecha actual.
  */
-const FECHA_DESDE = "2025-08-24";
 const FECHA_HASTA = formatearFecha(new Date());
+const FECHA_DESDE = restarDias(FECHA_HASTA, 365);
 
 async function main(): Promise<void> {
 
     const inicioGeneral = Date.now();
-    
 
-    const productores: Productor[] = obtenerProductoresRUS().map(productor => ({
-            codigo: productor.codigo,
-            nombre: productor.nombre.trim(),
-            estado_id: productor.estado_id }));
+    const productores: ProductorRUS[] =  obtenerProductoresRUS();
 
     console.log(`Se encontraron ${productores.length} productores activos para procesar.`);
 
@@ -51,8 +43,6 @@ async function main(): Promise<void> {
     const rusSyncService = new RusSyncService();
     const polizaRepository = new FirestorePolizaRepository();
     const rusSyncStateRepository = new FirestoreRusSyncStateRepository();
-
-
 
     const errores: ErrorProductor[] = [];
 
@@ -102,11 +92,12 @@ async function main(): Promise<void> {
         let fechaDesdeActual = FECHA_DESDE;
         const fechaHastaActual = FECHA_HASTA;
 
+        // Si existe un estado anterior y el bootstrap ya se completó, 
+        // se realiza una sincronización incremental desde la última fecha procesada menos 2 días.
         if (!FORZAR_BOOTSTRAP && estadoAnterior?.bootstrapCompleto === true && estadoAnterior.ultimaFechaProcesada) {
             modoActual = ModoSincronizacionRus.INCREMENTAL;
         
-            fechaDesdeActual = restarDias(estadoAnterior.ultimaFechaProcesada,2
-            );
+            fechaDesdeActual = restarDias(estadoAnterior.ultimaFechaProcesada,2);
         }
 
         console.log("Configuración seleccionada:");

@@ -12,4 +12,7 @@ export interface StatsCartera {
     compania: ECompania;
 
     cantidadPolizas: number;
+
+    grupoCartera?: string;
+
 }

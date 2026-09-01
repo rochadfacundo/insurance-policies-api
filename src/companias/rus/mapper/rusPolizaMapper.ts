@@ -1,6 +1,6 @@
 import { ECompania } from "../../../models/eCompania";
 import { Poliza } from "../../../models/poliza";
-import { Productor } from "../../../models/productor";
+import { Productor, ProductorBase } from "../../../models/productor";
 import { TipoVigencia } from "../../../models/tipoVigencia";
 import { DateUtils } from "../../../utils/dateUtils";
 import { RusPropuesta } from "../models/rusPropuestasInterfaces";
@@ -20,7 +20,7 @@ export class RusPolizaMapper {
      * @see Poliza 
      * @see RusPropuesta
      */
-    static mapear(propuesta: RusPropuesta, productor: Productor,riesgos: Poliza["riesgos"]): Poliza {
+    static mapear(propuesta: RusPropuesta, productor: ProductorBase,riesgos: Poliza["riesgos"]): Poliza {
 
         const inicioVigencia = DateUtils.parsearFecha(propuesta.inicioVigencia,"inicioVigencia");
 
@@ -35,7 +35,7 @@ export class RusPolizaMapper {
             compania: ECompania.RIO_URUGUAY,
             productor: {
                 codigo: productor.codigo,
-                nombre: productor.nombre
+                nombre: productor.nombre,
             },
             cliente: {
                 nombre: this.obtenerNombreAsegurado(propuesta)

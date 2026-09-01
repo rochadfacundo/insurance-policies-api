@@ -136,20 +136,18 @@ export class FirestoreStatsCarteraRepository {
      * Genera el ID único de la estadística.
      */
     private generarId(estadistica: StatsCartera): string {
-
-        if (estadistica.matricula !== null) {
-
-            return `${estadistica.compania}_${estadistica.matricula}`;
+    
+        if (estadistica.grupoCartera) {
+            return (`${estadistica.compania}_` +`${estadistica.grupoCartera}`);
         }
-
-
-        const nombreNormalizado =this.normalizarNombre(estadistica.nombreProductor);
-
-
-        return (
-            `${estadistica.compania}_SIN_MATRICULA_` +
-            `${nombreNormalizado}`
-        );
+    
+        if (estadistica.matricula !== null) {
+            return (`${estadistica.compania}_` +`${estadistica.matricula}`);
+        }
+    
+        const nombreNormalizado = this.normalizarNombre(estadistica.nombreProductor);
+    
+        return (`${estadistica.compania}_SIN_MATRICULA_` +`${nombreNormalizado}`);
     }
 
 
@@ -157,9 +155,7 @@ export class FirestoreStatsCarteraRepository {
      * Normaliza el nombre para poder utilizarlo
      * como parte del ID de Firestore.
      */
-    private normalizarNombre(
-        nombre: string
-    ): string {
+    private normalizarNombre(nombre: string): string {
 
         return nombre
             .normalize("NFD")

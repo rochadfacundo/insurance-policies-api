@@ -71,33 +71,21 @@ async function main(): Promise<void> {
 
     for (const productor of productores) {
 
-        const clave =
-            productor.matricula !== null
-                ? `MATRICULA_${productor.matricula}`
-                : `SIN_MATRICULA_${productor.codigo}`;
+        const clave = productor.grupoCartera  ? `GRUPO_${productor.grupoCartera}` : productor.matricula !== null
+                    ? `MATRICULA_${productor.matricula}`  : `SIN_MATRICULA_${productor.codigo}`;
 
 
-        const grupoActual =
-            gruposProductores.get(clave) ?? [];
+        const grupoActual = gruposProductores.get(clave) ?? [];
 
 
-        grupoActual.push(
-            productor
-        );
+        grupoActual.push(productor);
 
 
-        gruposProductores.set(
-            clave,
-            grupoActual
-        );
+        gruposProductores.set(clave,grupoActual);
     }
 
 
-    const grupos =
-        Array.from(
-            gruposProductores.values()
-        );
-
+    const grupos = Array.from(gruposProductores.values());
 
     const estadisticas: StatsCartera[] = [];
 

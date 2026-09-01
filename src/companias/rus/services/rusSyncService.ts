@@ -1,5 +1,5 @@
 import { Poliza } from "../../../models/poliza";
-import { Productor } from "../../../models/productor";
+import { Productor, ProductorBase } from "../../../models/productor";
 import { formatearDuracion } from "../../../utils/utils";
 import { RusPolizaMapper } from "../mapper/rusPolizaMapper";
 import { ModoSincronizacionRus } from "../models/modoSincronizacionRus";
@@ -41,9 +41,9 @@ export class RusSyncService {
      * @returns un objeto ResultadoRusSync con las métricas de la sincronización y las pólizas detectadas. 
      * @see Poliza para la estructura de las pólizas.
      * @see ResultadoRusSync para la estructura del resultado de la sincronización.
-     * @see Productor para la estructura del productor.
+     * @see ProductorBase para la estructura del productor.
     */
-    async sincronizar(productor: Productor, fechaDesde: string,fechaHasta: string,modo: ModoSincronizacionRus): Promise<ResultadoRusSync> {
+    async sincronizar(productor: ProductorBase, fechaDesde: string,fechaHasta: string,modo: ModoSincronizacionRus): Promise<ResultadoRusSync> {
 
 
         //debug trazo

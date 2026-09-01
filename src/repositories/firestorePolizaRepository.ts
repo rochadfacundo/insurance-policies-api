@@ -7,7 +7,7 @@ import {
 import { Poliza } from "../models/poliza";
 import { FirebaseConfig } from "../config/firebaseConfig";
 import { ECompania } from "../models/eCompania";
-import { Productor } from "../models/productor";
+import { Productor, ProductorBase } from "../models/productor";
 import { FirestorePolizaEliminadaRepository } from "./firestorePolizaEliminadaRepository";
 import { ResultadoSincronizacionRiesgos } from "../models/resultadoSincronizacionRiesgos";
 import { MotivoEliminacionPoliza } from "../models/polizaEliminada";
@@ -311,7 +311,7 @@ export class FirestorePolizaRepository {
     * @returns retorna una promesa que se resuelve con un objeto ResultadoSincronizacionRiesgos que contiene
     *  información sobre la cantidad de riesgos actuales, nuevos, actualizados y eliminados durante la sincronización. 
     */
-    async sincronizarRiesgosProductor(productor: Productor, compania: ECompania, riesgosActuales: Poliza[]): Promise<ResultadoSincronizacionRiesgos> {
+    async sincronizarRiesgosProductor(productor: ProductorBase, compania: ECompania, riesgosActuales: Poliza[]): Promise<ResultadoSincronizacionRiesgos> {
 
         const riesgosGuardados = await this.obtenerPorProductor(productor.codigo, compania);
 

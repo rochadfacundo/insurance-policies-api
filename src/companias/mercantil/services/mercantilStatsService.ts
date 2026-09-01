@@ -9,16 +9,19 @@ export class MercantilCarteraStatsService {
 
     constructor(private readonly carteraService = new MercantilCarteraService()) {}
 
-
+    /**
+     * Obtiene estadísticas de cartera para un conjunto de productores. 
+     * @param productores productores de los cuales se desea obtener estadísticas de cartera. 
+     * @returns Un objeto StatsCartera que contiene información agregada de la cartera de los productores proporcionados.
+     * @see StatsCartera 
+     */
     async obtener(productores: Productor[]): Promise<StatsCartera> {
 
         if (productores.length === 0) {
             throw new Error("No se recibieron productores para calcular estadísticas.");
         }
 
-
         const productorPrincipal = productores[0];
-
 
         if (!productorPrincipal) {
             throw new Error("No se pudo determinar el productor principal.");
@@ -39,13 +42,23 @@ export class MercantilCarteraStatsService {
             }
         }
 
-
-        return {
+        // Ahora construimos la estadística de cartera
+        const estadistica: StatsCartera = {
             matricula: productorPrincipal.matricula,
             nombreProductor: productorPrincipal.nombre,
-            codigosProductor: productores.map( productor => productor.codigo),
+            codigosProductor: productores.map(
+                productor => productor.codigo
+            ),
             compania: ECompania.MERCANTIL_ANDINA,
             cantidadPolizas: polizasPorNumero.size
         };
+        
+        // Si el productor principal tiene grupo de cartera, lo agregamos a la estadística
+        if (productorPrincipal.grupoCartera) {
+            estadistica.grupoCartera = productorPrincipal.grupoCartera;
+        }
+        
+        
+        return estadistica;
     }
 }

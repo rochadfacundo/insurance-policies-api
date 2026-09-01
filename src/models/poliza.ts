@@ -2,7 +2,7 @@ import { Cliente } from "./cliente";
 import { DetallePoliza } from "./detallePoliza";
 import { ECompania } from "./eCompania";
 import { Facturacion } from "./facturacion";
-import { Productor } from "./productor";
+import { Productor, ProductorBase } from "./productor";
 import { Riesgo } from "./riesgo";
 import { TipoRiesgo } from "./TipoRiesgo";
 import { Vigencia } from "./vigencia";
@@ -17,7 +17,7 @@ export interface Poliza {
   compania: ECompania;
 
   // Actores
-  productor: Productor;
+  productor: ProductorBase;
   cliente: Cliente;
 
   // Póliza

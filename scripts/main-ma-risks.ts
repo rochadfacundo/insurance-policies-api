@@ -1,28 +1,12 @@
 import axios from "axios";
 
-import {
-    obtenerProductoresMercantil
-} from "../src/companias/mercantil/models/productoresMercantil";
+import {obtenerProductoresMercantil} from "../src/companias/mercantil/models/productoresMercantil";
+import {MercantilSyncService} from "../src/companias/mercantil/services/mercantilSyncService";
+import {FirestorePolizaRepository} from "../src/repositories/firestorePolizaRepository";
+import {FirestoreErrorRepository} from "../src/repositories/firebaseErrorRepository";
+import {ECompania} from "../src/models/eCompania";
 
-import {
-    MercantilSyncService
-} from "../src/companias/mercantil/services/mercantilSyncService";
-
-import {
-    FirestorePolizaRepository
-} from "../src/repositories/firestorePolizaRepository";
-
-import {
-    FirestoreErrorRepository
-} from "../src/repositories/firebaseErrorRepository";
-
-import {
-    ECompania
-} from "../src/models/eCompania";
-
-import {
-    ErrorSincronizacion
-} from "../src/models/errorSincronizacion";
+import {ErrorSincronizacion} from "../src/models/errorSincronizacion";
 import { ErrorProductor } from "../src/models/errorProductor";
 import { ResumenGeneral } from "../src/models/sync";
 import { formatearDuracion } from "../src/utils/utils";
@@ -40,13 +24,8 @@ async function main(): Promise<void> {
      * Procesamos solamente productores activos.
         * Para pruebas, se puede filtrar por código de productor.
     */
-    //const productores = obtenerProductoresMercantil().filter(productor => productor.estado_id === 1);
-    const productores =
-    obtenerProductoresMercantil()
-        .filter(
-            productor =>
-                productor.codigo === 87692
-        );
+    const productores = obtenerProductoresMercantil().filter(productor => productor.estado_id === 1);
+  
 
 
     const erroresProductores: ErrorProductor[] = [];
@@ -171,6 +150,7 @@ async function main(): Promise<void> {
 
                     productor: {
                         codigo: productor.codigo,
+                        matricula: productor.matricula,
                         nombre: productor.nombre
                     },
 

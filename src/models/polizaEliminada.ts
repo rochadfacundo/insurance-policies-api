@@ -1,5 +1,5 @@
 import { ECompania } from "./eCompania";
-import { Productor } from "./productor";
+import { Productor, ProductorBase } from "./productor";
 import { TipoRiesgo } from "./TipoRiesgo";
 
 export interface PolizaEliminada {
@@ -7,7 +7,7 @@ export interface PolizaEliminada {
   
     compania: ECompania;
   
-    productor: Productor;
+    productor: ProductorBase;
   
     numeroPoliza: number;
     endoso?: number;

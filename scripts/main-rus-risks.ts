@@ -27,11 +27,18 @@ const FORZAR_BOOTSTRAP = false;
 const FECHA_HASTA = formatearFecha(new Date());
 const FECHA_DESDE = restarDias(FECHA_HASTA, 365);
 
+/**
+ * Rango utilizado para la sincronización incremental.
+ * Cubre los últimos 30 días desde la fecha actual. 
+ */
+const DIAS_LOOKBACK_INCREMENTAL = 30;
+
 async function main(): Promise<void> {
 
     const inicioGeneral = Date.now();
 
     const productores: ProductorRUS[] =  obtenerProductoresRUS();
+    //.filter(p => p.codigo === 5319);
 
     console.log(`Se encontraron ${productores.length} productores activos para procesar.`);
 
@@ -92,12 +99,12 @@ async function main(): Promise<void> {
         let fechaDesdeActual = FECHA_DESDE;
         const fechaHastaActual = FECHA_HASTA;
 
-        // Si existe un estado anterior y el bootstrap ya se completó, 
-        // se realiza una sincronización incremental desde la última fecha procesada menos 2 días.
+        // Si el productor ya tiene un estado de sincronización previo y el bootstrap ya se completó,
+        // se realiza una sincronización incremental.
         if (!FORZAR_BOOTSTRAP && estadoAnterior?.bootstrapCompleto === true && estadoAnterior.ultimaFechaProcesada) {
             modoActual = ModoSincronizacionRus.INCREMENTAL;
         
-            fechaDesdeActual = restarDias(estadoAnterior.ultimaFechaProcesada,2);
+            fechaDesdeActual = restarDias(estadoAnterior.ultimaFechaProcesada,DIAS_LOOKBACK_INCREMENTAL);
         }
 
         console.log("Configuración seleccionada:");
@@ -200,7 +207,7 @@ async function main(): Promise<void> {
 
             const resultFirestore = modoActual === ModoSincronizacionRus.BOOTSTRAP
                 ? await polizaRepository.sincronizarRiesgosProductor(productor, ECompania.RIO_URUGUAY, resultado.polizas)
-                : await polizaRepository.sincronizarRiesgosIncrementales(resultado.polizas);
+                : await polizaRepository.sincronizarRiesgosIncrementales(productor, ECompania.RIO_URUGUAY, resultado.polizas);
 
             totalRiesgosActuales += resultFirestore.riesgosActuales;
             totalRiesgosNuevos += resultFirestore.riesgosNuevos;

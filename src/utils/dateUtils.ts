@@ -47,22 +47,6 @@ export class DateUtils {
 
         const dias = this.diasEntre(desde, hasta);
 
-        if (Math.abs(dias - 30) <= 2) {
-            return TipoVigencia.MENSUAL;
-        }
-
-        if (Math.abs(dias - 60) <= 2) {
-            return TipoVigencia.BIMESTRAL;
-        }
-
-        if (Math.abs(dias - 90) <= 2) {
-            return TipoVigencia.TRIMESTRAL;
-        }
-
-        if (Math.abs(dias - 120) <= 2) {
-            return TipoVigencia.CUATRIMESTRAL;
-        }
-
         if (Math.abs(dias - 180) <= 2) {
             return TipoVigencia.SEMESTRAL;
         }
@@ -151,22 +135,6 @@ export class DateUtils {
     static calcularTipoVigencia(desde: Date, hasta: Date): TipoVigencia {
 
         const dias = Math.round(( hasta.getTime() - desde.getTime()) /(1000 * 60 * 60 * 24));
-
-        if (dias <= 35) {
-            return TipoVigencia.MENSUAL;
-        }
-
-        if (dias <= 70) {
-            return TipoVigencia.BIMESTRAL;
-        }
-
-        if (dias <= 100) {
-            return TipoVigencia.TRIMESTRAL;
-        }
-
-        if (dias <= 135) {
-            return TipoVigencia.CUATRIMESTRAL;
-        }
 
         if (dias <= 200) {
             return TipoVigencia.SEMESTRAL;

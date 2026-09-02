@@ -11,6 +11,7 @@ import { Productor, ProductorBase } from "../models/productor";
 import { FirestorePolizaEliminadaRepository } from "./firestorePolizaEliminadaRepository";
 import { ResultadoSincronizacionRiesgos } from "../models/resultadoSincronizacionRiesgos";
 import { MotivoEliminacionPoliza } from "../models/polizaEliminada";
+import { machineLearning } from "firebase-admin";
 
 export class FirestorePolizaRepository {
 
@@ -372,8 +373,9 @@ export class FirestorePolizaRepository {
         */
         for (const riesgoEliminado of riesgosQueYaNoExisten) {
 
-            this.polizaEliminadaRepository.agregarGuardadoDesdePolizaAlBatch(batch,riesgoEliminado,
-                MotivoEliminacionPoliza.DEJO_DE_SER_RIESGO);
+            const motivo = MotivoEliminacionPoliza.DEJO_DE_SER_RIESGO;
+
+            this.polizaEliminadaRepository.agregarGuardadoDesdePolizaAlBatch(batch,riesgoEliminado,motivo);
 
             const referenciaPoliza = this.firestore.collection(this.COLLECTION_NAME).doc(riesgoEliminado.id);
 
@@ -393,30 +395,49 @@ export class FirestorePolizaRepository {
 
     /**
      *  Sincroniza los riesgos incrementales de un productor.
-     * @param polizas arreglo de pólizas que se desean sincronizar en Firestore.    
+     * @param productor productor para el cual se desea sincronizar los riesgos incrementales.
+     * @param compania compañía por la cual se desea filtrar los riesgos.
+     * @param polizas arreglo de pólizas que representan los riesgos incrementales que se desean sincronizar
+     *  con los riesgos guardados en Firestore. 
      * @returns  retorna una promesa que se resuelve con un objeto que contiene información sobre la cantidad de riesgos
      *  actuales, nuevos, actualizados y eliminados durante la sincronización. 
+     * @see ResultadoSincronizacionRiesgos para la estructura del objeto de resultado de la sincronización de riesgos.
+     * @see ProductorBase para la estructura del productor.
+     * @see ECompania para la estructura de la compañía.
+     * @see Poliza para la estructura de la póliza.
      */
-    async sincronizarRiesgosIncrementales(polizas: Poliza[]): Promise<{
-        riesgosActuales: number;
-        riesgosNuevos: number;
-        riesgosActualizados: number;riesgosEliminados: number;
-    }> {
+    async sincronizarRiesgosIncrementales(productor: ProductorBase, compania: ECompania, polizas: Poliza[])
+    : Promise<ResultadoSincronizacionRiesgos> 
+    {
     
-        if (polizas.length === 0) {
-            return {
-                riesgosActuales: 0,
-                riesgosNuevos: 0,
-                riesgosActualizados: 0,
-                riesgosEliminados: 0
-            };
-        }
+        const riesgosGuardados = await this.obtenerPorProductor(productor.codigo, compania);
+        
+        const idsEntrantes = new Set(polizas.map(poliza => poliza.id));
+        
+        const ahora = new Date();
+        
+        const riesgosVencidos = riesgosGuardados.filter(poliza => {
+
+            const fechaHasta = poliza.vigencia?.hasta;
+        
+            if (!(fechaHasta instanceof Date)) {
+                return false;
+            }
+        
+            const finDelDia = new Date(fechaHasta);
+        
+            finDelDia.setHours(23, 59, 59, 999);
+        
+            return (finDelDia.getTime() < ahora.getTime() && !idsEntrantes.has(poliza.id));
+        });
     
         const coleccion = this.firestore.collection(this.COLLECTION_NAME);
     
         let riesgosNuevos = 0;
         let riesgosActualizados = 0;
     
+        const ahoraTimestamp = Timestamp.now();
+
         for (let indice = 0; indice < polizas.length; indice += this.BATCH_SIZE) {
             const lote = polizas.slice(indice, indice + this.BATCH_SIZE);
     
@@ -439,28 +460,50 @@ export class FirestorePolizaRepository {
                     riesgosActualizados++;
                 } else {
                     riesgosNuevos++;
+
+                    this.polizaEliminadaRepository.agregarEliminacionAlBatch(batch, poliza.id);
                 }
+
+                const fechaCreacion = documentoExistente.exists
+                    ? documentoExistente.get("fechaCreacion") ?? ahoraTimestamp
+                    : ahoraTimestamp;
+
+                const datos = this.prepararDocumento(poliza, fechaCreacion,ahoraTimestamp);
     
-                batch.set(
-                    referencia,
-                    {
-                        ...poliza,
-                        fechaActualizacion: new Date()
-                    },
-                    {
-                        merge: true
-                    }
-                );
+                batch.set(referencia, datos);
             }
     
             await batch.commit();
         }
+
+        const BATCH_SIZE_ELIMINACIONES = 200;
+
+        for (let indice = 0; indice < riesgosVencidos.length;indice += BATCH_SIZE_ELIMINACIONES) {
+        
+            const lote = riesgosVencidos.slice(indice, indice + BATCH_SIZE_ELIMINACIONES);
+        
+            const batch = this.firestore.batch();
+        
+            for (const riesgoVencido of lote) {
+
+                const motivo = MotivoEliminacionPoliza.DEJO_DE_SER_RIESGO;
+        
+                this.polizaEliminadaRepository.agregarGuardadoDesdePolizaAlBatch(batch, riesgoVencido ,motivo);
+        
+                const referencia = coleccion.doc(riesgoVencido.id);
+        
+                batch.delete(referencia);
+            }
+        
+            await batch.commit();
+        }
+
     
         return {
             riesgosActuales: polizas.length,
             riesgosNuevos,
             riesgosActualizados,
-            riesgosEliminados: 0
+            riesgosEliminados: riesgosVencidos.length
         };
     }
 

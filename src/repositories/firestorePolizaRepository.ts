@@ -507,5 +507,22 @@ export class FirestorePolizaRepository {
         };
     }
 
+    /**
+     * Obtiene las pólizas cuya vigencia finaliza
+     * dentro del rango de fechas indicado.
+     */
+    async obtenerProximasAVencer(fechaDesde: Date,fechaHasta: Date): Promise<Poliza[]> {
+
+        const desde = Timestamp.fromDate(fechaDesde);
+        const hasta = Timestamp.fromDate(fechaHasta);
+
+        const resultado = await this.firestore.collection(this.COLLECTION_NAME)
+            .where("vigencia.hasta", ">=", desde)
+            .where("vigencia.hasta", "<=", hasta)
+            .get();
+
+        return resultado.docs.map(documento => this.mapearDocumento(documento.id, documento.data()));
+    }
+
 
 }

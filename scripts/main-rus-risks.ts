@@ -18,7 +18,7 @@ const ESCRIBIR_FIRESTORE = true;
 /**
  * Habilita o deshabilita la reconstrucción completa de la cartera.
  */
-const FORZAR_BOOTSTRAP = false;
+const FORZAR_BOOTSTRAP = true;
 
 /**
  * Rango utilizado para reconstruir la cartera.
@@ -37,8 +37,19 @@ async function main(): Promise<void> {
 
     const inicioGeneral = Date.now();
 
-    const productores: ProductorRUS[] =  obtenerProductoresRUS();
-    //.filter(p => p.codigo === 5319);
+    //const productores: ProductorRUS[] =  obtenerProductoresRUS();
+    const CODIGOS_PRODUCTORES = [
+        8563,   // Caleffa Ariel Emiliano
+        13540,  // Emmanuel Sole
+        5319    // Javier Fessel
+    ];
+    
+    const productores: ProductorRUS[] = obtenerProductoresRUS()
+        .filter(productor =>
+            CODIGOS_PRODUCTORES.includes(productor.codigo)
+        );
+
+    //.filter(p => p.codigo === 15977);
 
     console.log(`Se encontraron ${productores.length} productores activos para procesar.`);
 

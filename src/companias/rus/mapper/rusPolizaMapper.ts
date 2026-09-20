@@ -67,26 +67,36 @@ export class RusPolizaMapper {
     }
 
     /**
-     * Método privado que obtiene el nombre del asegurado a partir de la propuesta. 
-     * @param propuesta es la propuesta de RUS de la cual se desea obtener el nombre del asegurado. 
-     * @returns una cadena con el nombre del asegurado, ya sea el nombre de la persona o la razón social, 
-     * o "SIN NOMBRE" si no se encuentra ninguno. 
+     * Obtiene el nombre del asegurado a partir de una propuesta de RUS.
+     * @param propuesta es la propuesta de RUS de la cual se quiere obtener el nombre del asegurado.
+     * @returns El nombre del asegurado, que puede ser el nombre de la persona física o la razón social de la persona jurídica,
+     *  dependiendo de la información disponible en la propuesta. Si no hay información disponible, retorna "SIN NOMBRE".
      * @see RusPropuesta
      */
     private static obtenerNombreAsegurado(propuesta: RusPropuesta): string {
 
         const nombrePersona = propuesta.nombrePersona?.trim();
-
+    
+        const razonSocial = propuesta.razonSocial?.trim();
+    
+        // Persona física:
+        // RUS informa el apellido en razonSocial
+        // y el/los nombres en nombrePersona.
+        if (nombrePersona && razonSocial) {
+            return `${razonSocial} ${nombrePersona}`;
+        }
+    
+        // Si solamente existe nombrePersona.
         if (nombrePersona) {
             return nombrePersona;
         }
-
-        const razonSocial = propuesta.razonSocial?.trim();
-
+    
+        // Persona jurídica o caso donde RUS
+        // solamente informa razonSocial.
         if (razonSocial) {
             return razonSocial;
         }
-
+    
         return "SIN NOMBRE";
     }
 

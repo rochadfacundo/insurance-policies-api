@@ -31,6 +31,35 @@ export class DateUtils {
     }
 
     /**
+ * Obtiene el nombre del mes siguiente a la fecha de referencia.
+ *
+ * Ejemplo:
+ * 20/09/2026 -> "Octubre 2026"
+ * 20/12/2026 -> "Enero 2027"
+ */
+static obtenerMesRenovacion(fechaReferencia: Date): string {
+
+    const mesSiguiente = new Date(
+        fechaReferencia.getFullYear(),
+        fechaReferencia.getMonth() + 1,
+        1
+    );
+
+    const texto = mesSiguiente.toLocaleDateString(
+        "es-AR",
+        {
+            month: "long",
+            year: "numeric"
+        }
+    );
+
+    return (
+        texto.charAt(0).toUpperCase() +
+        texto.slice(1)
+    );
+}
+
+    /**
      * Determina si una fecha está vigente.
      */
     static estaVigente(desde: Date,hasta: Date): boolean {

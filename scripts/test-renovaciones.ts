@@ -142,11 +142,9 @@ function ordenarPorVencimiento(polizas: Poliza[]): Poliza[] {
     return [...polizas].sort(
         (a, b) => {
 
-            const fechaA =
-                obtenerFechaVencimiento(a);
+            const fechaA = obtenerFechaVencimiento(a);
 
-            const fechaB =
-                obtenerFechaVencimiento(b);
+            const fechaB = obtenerFechaVencimiento(b);
 
 
             if (!fechaA && !fechaB) {
@@ -164,10 +162,7 @@ function ordenarPorVencimiento(polizas: Poliza[]): Poliza[] {
             }
 
 
-            return (
-                fechaA.getTime() -
-                fechaB.getTime()
-            );
+            return (fechaA.getTime() - fechaB.getTime());
         }
     );
 }
@@ -287,10 +282,7 @@ async function main(): Promise<void> {
         console.log("==================================================");
 
         console.log(`EJECUTIVA:       ${grupo.ejecutiva.nombre} ${grupo.ejecutiva.apellido}`);
-
         console.log(`EMAIL REAL:      ${grupo.ejecutiva.email}`);
-
-
         console.log(`PÓLIZAS:         ${polizas.length}`);
 
         console.log("==================================================");
@@ -304,15 +296,10 @@ async function main(): Promise<void> {
             console.log("");
 
             console.log(`Productor:   ${poliza.productor.nombre}`);
-
             console.log(`Código PAS:  ${poliza.productor.codigo}`);
-
             console.log(`Compañía:    ${poliza.compania}`);
-
             console.log(`N° Póliza:   ${poliza.detallePoliza.numeroPoliza}`);
-
             console.log(`Asegurado:   ${poliza.cliente.nombre}`);
-
             console.log(`Vencimiento: ${
                     vencimiento
                         ? formatearFecha(vencimiento)
@@ -337,9 +324,7 @@ async function main(): Promise<void> {
     console.log("==================================================");
 
     console.log(`Correos a generar: ${renovaciones.length}`);
-
     console.log(`Total pólizas:     ${totalPolizas}`);
-
     console.log(`Modo destinatarios: ${
             MODO_PRUEBA
                 ? `PRUEBA → ${EMAIL_PRUEBA}`
@@ -356,7 +341,6 @@ async function main(): Promise<void> {
 
         console.log("");
         console.log("⚠ ENVIAR_EMAIL = false");
-
         console.log("No se envió ningún correo.");
 
         return;

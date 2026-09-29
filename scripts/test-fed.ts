@@ -1356,8 +1356,7 @@ for (const fecha of fechasFlotaPrueba) {
         }
     );
 
-    const certificados =
-        response.data?.certificados;
+    const certificados = response.data?.certificados;
 
     if (!Array.isArray(certificados)) {
 
@@ -1526,38 +1525,17 @@ for (
         certificados
             .slice(0, 5)
             .map(certificado => ({
-                fechaConsulta:
-                    certificado.fechaConsulta,
-
-                codigo_ramo:
-                    certificado.codigo_ramo,
-
-                numero_poliza:
-                    certificado.numero_poliza,
-
-                certificado:
-                    certificado.certificado,
-
-                estado_certificado:
-                    certificado.estado_certificado,
-
-                fecha_estado:
-                    certificado.fecha_estado,
-
-                vigencia_desde:
-                    certificado.vigencia_desde,
-
-                vigencia_hasta:
-                    certificado.vigencia_hasta,
-
-                renovacion_aumatica:
-                    certificado.renovacion_aumatica,
-
-                renovada_por:
-                    certificado.renovada_por,
-
-                renueva_a:
-                    certificado.renueva_a
+                fechaConsulta: certificado.fechaConsulta,
+                codigo_ramo: certificado.codigo_ramo,
+                numero_poliza: certificado.numero_poliza,
+                certificado: certificado.certificado,
+                estado_certificado: certificado.estado_certificado,
+                fecha_estado: certificado.fecha_estado,
+                vigencia_desde: certificado.vigencia_desde,
+                vigencia_hasta: certificado.vigencia_hasta,
+                renovacion_aumatica: certificado.renovacion_aumatica,
+                renovada_por: certificado.renovada_por,
+                renueva_a: certificado.renueva_a
             })),
         {
             depth: null,
@@ -1613,29 +1591,14 @@ console.dir(
     conRenuevaA
         .slice(0, 10)
         .map(certificado => ({
-            fechaConsulta:
-                certificado.fechaConsulta,
-
-            codigo_ramo:
-                certificado.codigo_ramo,
-
-            numero_poliza:
-                certificado.numero_poliza,
-
-            certificado:
-                certificado.certificado,
-
-            vigencia_desde:
-                certificado.vigencia_desde,
-
-            vigencia_hasta:
-                certificado.vigencia_hasta,
-
-            renovada_por:
-                certificado.renovada_por,
-
-            renueva_a:
-                certificado.renueva_a
+            fechaConsulta: certificado.fechaConsulta,
+            codigo_ramo: certificado.codigo_ramo,
+            numero_poliza: certificado.numero_poliza,
+            certificado: certificado.certificado,
+            vigencia_desde: certificado.vigencia_desde,
+            vigencia_hasta: certificado.vigencia_hasta,
+            renovada_por: certificado.renovada_por,
+            renueva_a: certificado.renueva_a
         })),
     {
         depth: null,
@@ -1653,31 +1616,16 @@ console.log("EJEMPLOS CON renovada_por:");
 
 console.dir(
     conRenovadaPor
-        .slice(0, 10)
+        .slice(0, 10)                   
         .map(certificado => ({
-            fechaConsulta:
-                certificado.fechaConsulta,
-
-            codigo_ramo:
-                certificado.codigo_ramo,
-
-            numero_poliza:
-                certificado.numero_poliza,
-
-            certificado:
-                certificado.certificado,
-
-            vigencia_desde:
-                certificado.vigencia_desde,
-
-            vigencia_hasta:
-                certificado.vigencia_hasta,
-
-            renovada_por:
-                certificado.renovada_por,
-
-            renueva_a:
-                certificado.renueva_a
+            fechaConsulta:certificado.fechaConsulta,                 
+            codigo_ramo:certificado.codigo_ramo,                 
+            numero_poliza:certificado.numero_poliza,                 
+            certificado:certificado.certificado,                 
+            vigencia_desde:certificado.vigencia_desde,                 
+            vigencia_hasta:certificado.vigencia_hasta,                 
+            renovada_por:certificado.renovada_por,                 
+            renueva_a:certificado.renueva_a
         })),
     {
         depth: null,
@@ -1712,17 +1660,13 @@ const relacionesEncontradas =
                 )
         )
         .map(certificado => ({
-            polizaOrigen:
-                certificado.numero_poliza,
+            polizaOrigen: certificado.numero_poliza,
 
-            renuevaA:
-                certificado.renueva_a,
+            renuevaA: certificado.renueva_a,
 
-            ramo:
-                certificado.codigo_ramo,
+            ramo: certificado.codigo_ramo,
 
-            fechaConsulta:
-                certificado.fechaConsulta
+            fechaConsulta: certificado.fechaConsulta
         }));
 
 console.log(

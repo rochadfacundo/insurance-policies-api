@@ -5,6 +5,7 @@ import { FedPatRiesgoCubierto }
     from "../models/fedPatRiesgoCubierto";
 import { FedPatRiesgosCubiertosResponse }
     from "../models/fedPatRiesgosCubiertosResponse";
+import { FedPatHttpUtils } from "../utils/fedPatHttpUtils";
 
 /**
  * Servicio responsable de consultar las coberturas asociadas
@@ -32,34 +33,44 @@ export class FedPatRiesgosCubiertosService {
     }
 
     /**
-     * Obtiene las coberturas de riesgos informadas por Federación
-     * Patronal para una fecha determinada.
-     *
-     * La fecha debe utilizar el formato requerido por la API:
-     * dd/MM/yyyy.
-     *
-     * Los registros se devuelven sin filtros, agregaciones ni
-     * transformaciones para preservar la información original
-     * correspondiente a cada certificado y endoso.
-     *
-     * @param fecha Fecha de consulta en formato dd/MM/yyyy.
-     * @returns Coberturas de riesgos correspondientes a la fecha.
-     */
+    * Obtiene las coberturas de riesgos informadas por Federación
+    * Patronal para una fecha determinada.
+    *
+    * La consulta utiliza el mecanismo de retry compartido para tolerar
+    * errores transitorios de transporte durante la reconstrucción
+    * histórica de la cartera.
+    *
+    * Los registros se devuelven sin filtros, agregaciones ni
+    * transformaciones para preservar la información original
+    * correspondiente a cada certificado y endoso.
+    *
+    * @param fecha Fecha de consulta en formato dd/MM/yyyy.
+    * @returns Coberturas de riesgos correspondientes a la fecha.
+    */
     async obtenerRiesgosCubiertos(fecha: string): Promise<FedPatRiesgoCubierto[]> {
 
         const token = await this.authService.getAccessToken();
 
-        const response = await axios.get<FedPatRiesgosCubiertosResponse>(
-                `${this.baseUrl}/v1/cartera/riesgos-cubiertos`,
-                {
-                    params: {
-                        fecha,
-                        tipo: "O"
-                    },
-                    headers: {
-                        Authorization: `Bearer ${token}`
-                    }
-                }
+        /*
+        * El retry envuelve únicamente la consulta HTTP.
+        *
+        * Ante un error transitorio como ECONNRESET se repite exactamente
+        * la consulta de riesgos-cubiertos para la misma fecha.
+        */
+        const response = await FedPatHttpUtils.ejecutarConRetry(
+                () =>
+                    axios.get<FedPatRiesgosCubiertosResponse>(
+                        `${this.baseUrl}/v1/cartera/riesgos-cubiertos`,
+                        {
+                            params: {
+                                fecha,
+                                tipo: "O"
+                            },
+                            headers: {
+                                Authorization: `Bearer ${token}`
+                            }
+                        }
+                    )
             );
 
         return response.data.riesgos_cubiertos;

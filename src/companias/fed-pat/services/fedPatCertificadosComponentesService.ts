@@ -2,6 +2,7 @@ import axios from "axios";
 import { FedPatAuthService } from "./fedPatAuthService";
 import { FedPatCertificadoComponente } from "../models/fedPatCertificadoComponente";
 import { FedPatCertificadosComponentesResponse } from "../models/fedPatCertificadosComponentesResponse";
+import { FedPatHttpUtils } from "../utils/fedPatHttpUtils";
 
 
 /**
@@ -32,12 +33,13 @@ export class FedPatCertificadosComponentesService {
      * Obtiene los componentes económicos informados por Federación
      * Patronal para una fecha determinada.
      *
-     * La fecha debe utilizar el formato requerido por la API:
-     * dd/MM/yyyy.
+     * La consulta utiliza el mecanismo de retry compartido para tolerar
+     * errores transitorios de transporte durante la reconstrucción
+     * histórica de la cartera.
      *
-     * No se realizan agregaciones ni transformaciones sobre `valor`,
-     * ya que los registros pertenecen a movimientos de endoso y
-     * pueden contener importes positivos o negativos.
+     * Los registros se devuelven sin agregaciones ni transformaciones
+     * para preservar los movimientos económicos originales informados
+     * para cada certificado y endoso.
      *
      * @param fecha Fecha de consulta en formato dd/MM/yyyy.
      * @returns Componentes económicos correspondientes a la fecha.
@@ -46,19 +48,27 @@ export class FedPatCertificadosComponentesService {
 
         const token = await this.authService.getAccessToken();
 
-        const response = await axios.get<FedPatCertificadosComponentesResponse>(
-                `${this.baseUrl}/v1/cartera/certificados-componentes`,
-                {
-                    params: {
-                        fecha,
-                        tipo: "O"
-                    },
-                    headers: {
-                        Authorization: `Bearer ${token}`
-                    }
-                }
+        /*
+        * El retry envuelve únicamente la consulta HTTP.
+        *
+        * Ante un error transitorio como ECONNRESET se repite exactamente
+        * la consulta de certificados-componentes para la misma fecha.
+        */
+        const response = await FedPatHttpUtils.ejecutarConRetry(
+                () =>
+                    axios.get<FedPatCertificadosComponentesResponse>(
+                        `${this.baseUrl}/v1/cartera/certificados-componentes`,
+                        {
+                            params: {
+                                fecha,
+                                tipo: "O"
+                            },
+                            headers: {
+                                Authorization: `Bearer ${token}`
+                            }
+                        }
+                    )
             );
-
 
         return response.data.componentes;
     }

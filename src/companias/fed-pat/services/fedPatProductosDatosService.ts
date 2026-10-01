@@ -2,6 +2,7 @@ import axios from "axios";
 import { FedPatAuthService } from "./fedPatAuthService";
 import { FedPatProductoDato } from "../models/fedPatProductoDato";
 import { FedPatProductosDatosResponse } from "../models/fedPatProductosDatosResponse";
+import { FedPatHttpUtils } from "../utils/fedPatHttpUtils";
 
 /**
  * Servicio responsable de consultar los datos específicos de los
@@ -30,10 +31,11 @@ export class FedPatProductosDatosService {
      * Obtiene los datos de productos informados por Federación
      * Patronal para una fecha determinada.
      *
-     * La fecha debe utilizar el formato requerido por la API:
-     * dd/MM/yyyy.
+     * La consulta utiliza el mecanismo de retry compartido para tolerar
+     * errores transitorios de transporte durante la reconstrucción
+     * histórica de la cartera.
      *
-     * Los registros se devuelven sin filtrar ni agrupar para mantener
+     * Los registros se devuelven sin filtrar ni transformar para mantener
      * intacta la relación original entre póliza, certificado, endoso,
      * código de dato y valor.
      *
@@ -44,17 +46,26 @@ export class FedPatProductosDatosService {
 
         const token = await this.authService.getAccessToken();
 
-        const response = await axios.get<FedPatProductosDatosResponse>(
-                `${this.baseUrl}/v1/cartera/productos-datos`,
-                {
-                    params: {
-                        fecha,
-                        tipo: "O"
-                    },
-                    headers: {
-                        Authorization: `Bearer ${token}`
-                    }
-                }
+        /*
+        * El retry envuelve únicamente la consulta HTTP.
+        *
+        * Ante un error transitorio como ECONNRESET se repite exactamente
+        * la consulta de productos-datos para la misma fecha.
+        */
+        const response = await FedPatHttpUtils.ejecutarConRetry(
+                () =>
+                    axios.get<FedPatProductosDatosResponse>(
+                        `${this.baseUrl}/v1/cartera/productos-datos`,
+                        {
+                            params: {
+                                fecha,
+                                tipo: "O"
+                            },
+                            headers: {
+                                Authorization: `Bearer ${token}`
+                            }
+                        }
+                    )
             );
 
         return response.data.producto_datos;

@@ -3,6 +3,7 @@ import axios from "axios";
 import { FedPatAuthService } from "./fedPatAuthService";
 import { FedPatCliente } from "../models/fedPatCliente";
 import { FedPatClientesResponse } from "../models/fedPatCarteraResponse";
+import { FedPatHttpUtils } from "../utils/fedPatHttpUtils";
 
 
 /**
@@ -31,8 +32,9 @@ export class FedPatClientesService {
      * Obtiene los clientes informados por Federación Patronal
      * para una fecha determinada.
      *
-     * La fecha debe utilizar el formato requerido por la API:
-     * dd/MM/yyyy.
+     * La consulta utiliza el mecanismo de retry compartido para tolerar
+     * errores transitorios de transporte durante la reconstrucción
+     * histórica de la cartera.
      *
      * Los registros se devuelven sin modificaciones para conservar
      * los valores originales, incluidos aquellos campos opcionales
@@ -45,18 +47,27 @@ export class FedPatClientesService {
 
         const token = await this.authService.getAccessToken();
 
-        const response = await axios.get<FedPatClientesResponse>(
-            `${this.baseUrl}/v1/cartera/clientes`,
-            {
-                params: {
-                    fecha,
-                    tipo: "O"
-                },
-                headers: {
-                    Authorization: `Bearer ${token}`
-                }
-            }
-        );
+        /*
+        * El retry envuelve únicamente la consulta HTTP.
+        *
+        * Ante un error transitorio como ECONNRESET se repite exactamente
+        * la consulta de clientes para la misma fecha.
+        */
+        const response = await FedPatHttpUtils.ejecutarConRetry(
+                () =>
+                    axios.get<FedPatClientesResponse>(
+                        `${this.baseUrl}/v1/cartera/clientes`,
+                        {
+                            params: {
+                                fecha,
+                                tipo: "O"
+                            },
+                            headers: {
+                                Authorization: `Bearer ${token}`
+                            }
+                        }
+                    )
+            );
 
         return response.data.clientes;
     }

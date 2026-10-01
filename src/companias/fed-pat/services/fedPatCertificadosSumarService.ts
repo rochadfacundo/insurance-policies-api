@@ -3,6 +3,7 @@ import axios from "axios";
 import { FedPatAuthService } from "./fedPatAuthService";
 import { FedPatCertificadoSuma } from "../models/fedPatCertificadoSuma";
 import { FedPatCertificadosSumasResponse } from "../models/fedPatCertificadosSumasResponse";
+import { FedPatHttpUtils } from "../utils/fedPatHttpUtils";
 
 /**
  * Servicio responsable de consultar las sumas y valores económicos
@@ -33,12 +34,13 @@ export class FedPatCertificadosSumasService {
      * Obtiene las sumas asociadas a los certificados informados
      * por Federación Patronal para una fecha determinada.
      *
-     * La fecha debe utilizar el formato requerido por la API:
-     * dd/MM/yyyy.
+     * La consulta utiliza el mecanismo de retry compartido para tolerar
+     * errores transitorios de transporte durante la reconstrucción
+     * histórica de la cartera.
      *
-     * No se realizan cálculos ni agregaciones sobre prima, premio
-     * o suma asegurada. Los valores se devuelven exactamente como
-     * fueron recibidos desde la API.
+     * Los valores económicos se conservan sin transformaciones; cualquier
+     * interpretación de prima, premio o suma asegurada corresponde a las
+     * capas posteriores de negocio.
      *
      * @param fecha Fecha de consulta en formato dd/MM/yyyy.
      * @returns Información económica de los certificados.
@@ -47,17 +49,26 @@ export class FedPatCertificadosSumasService {
 
         const token = await this.authService.getAccessToken();
 
-        const response = await axios.get<FedPatCertificadosSumasResponse>(
-                `${this.baseUrl}/v1/cartera/certificados-sumas`,
-                {
-                    params: {
-                        fecha,
-                        tipo: "O"
-                    },
-                    headers: {
-                        Authorization: `Bearer ${token}`
-                    }
-                }
+        /*
+        * El retry afecta únicamente a la operación HTTP.
+        *
+        * Ante un error transitorio como ECONNRESET se repite la consulta
+        * de certificados-sumas para la misma fecha.
+        */
+        const response = await FedPatHttpUtils.ejecutarConRetry(
+                () =>
+                    axios.get<FedPatCertificadosSumasResponse>(
+                        `${this.baseUrl}/v1/cartera/certificados-sumas`,
+                        {
+                            params: {
+                                fecha,
+                                tipo: "O"
+                            },
+                            headers: {
+                                Authorization: `Bearer ${token}`
+                            }
+                        }
+                    )
             );
 
         return response.data.certificados_sumas;

@@ -7,6 +7,8 @@ import { FedPatDato }
 import { FedPatTabla }
     from "../models/fedPatTabla";
 
+import { TipoRiesgo }
+    from "../../../models/TipoRiesgo";
 
 import { FedPatPolizaConsolidationService }
     from "./fedPatPolizaConsolidationService";
@@ -18,7 +20,10 @@ import {
     FedPatVehiculo,
     FedPatVehiculoMapper
 } from "../mappers/fedPatVehiculoMapper";
-import { TipoRiesgo } from "../../../models/TipoRiesgo";
+
+import { FedPatImportesService }
+    from "./fedPatImportesService";
+import { FedPatCertificadoEndoso } from "../models/fedPatCertificadoEndoso";
 
 
 /**
@@ -30,25 +35,69 @@ import { TipoRiesgo } from "../../../models/TipoRiesgo";
  * diagnóstico y futuras reglas de negocio.
  */
 export interface FedPatRiskAnalysis {
+
+    /**
+     * Riesgos detectados para la póliza luego de aplicar
+     * todas las reglas de negocio configuradas.
+     */
     riesgos: TipoRiesgo[];
+
+    /**
+     * Vehículos identificables reconstruidos a partir de los
+     * certificados y productos-datos de la póliza.
+     */
     vehiculos: FedPatVehiculo[];
+
+    /**
+     * Prima anual normalizada utilizada por el motor para evaluar
+     * el riesgo PRIMA_ALTA.
+     *
+     * null indica que no fue posible determinar un importe anual
+     * confiable con la información disponible.
+     */
+    primaAnual: number | null;
+
+    /**
+     * Premio anual normalizado utilizado por el motor para evaluar
+     * el riesgo PREMIO_ALTO.
+     *
+     * null indica que no fue posible determinar un importe anual
+     * confiable con la información disponible.
+     */
+    premioAnual: number | null;
+
+        /**
+     * Movimiento utilizado como fuente de facturación para calcular
+     * los importes anualizados.
+     *
+     * Se conserva para que la póliza normalizada utilice el mismo
+     * período de facturación que originó el análisis económico.
+     */
+    endosoFacturacion: FedPatCertificadoEndoso | null;
 }
 
 
 /**
  * Motor de reglas de riesgo para pólizas de Federación Patronal.
  *
- * En esta primera implementación solamente se evalúa FLOTA.
+ * Actualmente se evalúan tres riesgos independientes:
  *
- * Una póliza se considera candidata a FLOTA cuando:
+ * - FLOTA:
+ *   más de un vehículo distinto identificable dentro de una
+ *   póliza perteneciente a un ramo vehicular soportado.
  *
- * - pertenece a un ramo vehicular soportado;
- * - se pueden reconstruir más de un vehículo distinto
- *   a partir de sus certificados y productos-datos.
+ * - PRIMA_ALTA:
+ *   prima anual calculada mayor o igual a $5.000.000.
  *
- * No se utiliza directamente la cantidad de certificados porque
- * algunos certificados pueden representar cabeceras o movimientos
- * administrativos y no necesariamente bienes asegurados.
+ * - PREMIO_ALTO:
+ *   premio anual calculado mayor o igual a $7.000.000.
+ *
+ * Los importes anuales no se calculan dentro del RiskEngine.
+ * Esa responsabilidad pertenece a FedPatImportesService.
+ *
+ * Si FedPatImportesService no dispone de evidencia suficiente
+ * para anualizar un importe, retorna null y el riesgo económico
+ * correspondiente no se asigna.
  */
 export class FedPatRiskEngine {
 
@@ -62,6 +111,16 @@ export class FedPatRiskEngine {
      */
     private readonly RAMO_MOTOVEHICULOS = 44;
 
+    /**
+     * Umbral anual utilizado para detectar PRIMA_ALTA.
+     */
+    private readonly PRIMA_ALTA_MINIMA = 5_000_000;
+
+    /**
+     * Umbral anual utilizado para detectar PREMIO_ALTO.
+     */
+    private readonly PREMIO_ALTO_MINIMO = 7_000_000;
+
 
     private readonly consolidationService =
         new FedPatPolizaConsolidationService();
@@ -72,35 +131,88 @@ export class FedPatRiskEngine {
     private readonly vehiculoMapper =
         new FedPatVehiculoMapper();
 
+    private readonly importesService =
+        new FedPatImportesService();
+
 
     /**
      * Analiza el estado acumulado conocido de una póliza.
+     *
+     * Las reglas económicas se evalúan para cualquier ramo.
+     *
+     * La reconstrucción de vehículos y la detección de FLOTA
+     * solamente se realizan para los ramos vehiculares soportados.
      *
      * @param estado Estado reconstruido a partir de los feeds diarios.
      * @param datos Catálogo general /cartera/datos.
      * @param tablas Catálogo /cartera/tablas utilizado para traducir
      * valores codificados de productos-datos.
      */
-    analizar(
-        estado: FedPatPolizaState,
-        datos: FedPatDato[],
-        tablas: FedPatTabla[]
-    ): FedPatRiskAnalysis {
+    analizar(estado: FedPatPolizaState, datos: FedPatDato[],tablas: FedPatTabla[]): FedPatRiskAnalysis {
 
         const riesgos: TipoRiesgo[] = [];
 
         /*
-         * Por el momento solamente intentamos reconstruir vehículos
-         * para ramos cuya naturaleza vehicular fue confirmada:
+         * Los importes anuales se calculan independientemente
+         * del ramo de la póliza.
          *
-         * 4  = AUTOMOTORES
-         * 44 = MOTOVEHÍCULOS
+         * FedPatImportesService devuelve null cuando no existe
+         * evidencia suficiente para realizar una anualización
+         * confiable.
          */
+        const importes = this.importesService.calcularImportesAnuales(estado);
+
+
+        /*
+         * PRIMA_ALTA se determina exclusivamente sobre la
+         * prima anual calculada.
+         *
+         * No utilizamos directamente la prima informada por
+         * certificados-sumas porque observamos que puede
+         * representar importes acumulados y no necesariamente
+         * el costo anual de la póliza.
+         */
+        if (importes.primaAnual !== null && importes.primaAnual >= this.PRIMA_ALTA_MINIMA) {
+
+            riesgos.push(TipoRiesgo.PRIMA_ALTA);
+        }
+
+
+        /*
+         * PREMIO_ALTO se determina exclusivamente sobre el
+         * premio anual calculado.
+         *
+         * El cálculo del premio anual y del factor utilizado
+         * pertenece a FedPatImportesService.
+         */
+        if (importes.premioAnual !== null && importes.premioAnual >= this.PREMIO_ALTO_MINIMO) {
+
+            riesgos.push(TipoRiesgo.PREMIO_ALTO);
+        }
+
+
+        /*
+        * La lógica económica termina acá.
+        *
+        * Si el ramo no es vehicular no intentamos reconstruir
+        * vehículos, pero conservamos los riesgos económicos y
+        * los importes anuales calculados previamente.
+        */
         if (!this.esRamoVehicular(estado.codigoRamo)) {
 
+            /*
+            * Conservamos también el movimiento de facturación utilizado
+            * por FedPatImportesService.
+            *
+            * De esta manera el consumidor del análisis puede utilizar
+            * exactamente el mismo endoso que originó los importes anuales.
+            */
             return {
                 riesgos,
-                vehiculos: []
+                vehiculos: [],
+                primaAnual: importes.primaAnual,
+                premioAnual: importes.premioAnual,
+                endosoFacturacion: importes.endosoFacturacion
             };
         }
 
@@ -118,15 +230,23 @@ export class FedPatRiskEngine {
          * identificable dentro de la misma póliza.
          */
         if (vehiculos.length > 1) {
+
             riesgos.push(
                 TipoRiesgo.FLOTA
             );
         }
 
 
+        /*
+        * El resultado expone tanto los riesgos detectados como los
+        * valores y el movimiento que justificaron el análisis económico.
+        */
         return {
             riesgos,
-            vehiculos
+            vehiculos,
+            primaAnual: importes.primaAnual,
+            premioAnual: importes.premioAnual,
+            endosoFacturacion: importes.endosoFacturacion
         };
     }
 
@@ -193,6 +313,7 @@ export class FedPatRiskEngine {
             if (
                 consolidado.productosDatos.length === 0
             ) {
+
                 continue;
             }
 
@@ -223,6 +344,7 @@ export class FedPatRiskEngine {
              * el registro como un vehículo distinto.
              */
             if (!claveVehiculo) {
+
                 continue;
             }
 
@@ -263,7 +385,9 @@ export class FedPatRiskEngine {
                 vehiculo.chasis
             );
 
+
         if (chasis) {
+
             return `CHASIS:${chasis}`;
         }
 
@@ -273,7 +397,9 @@ export class FedPatRiskEngine {
                 vehiculo.patente
             );
 
+
         if (patente) {
+
             return `PATENTE:${patente}`;
         }
 
@@ -293,20 +419,25 @@ export class FedPatRiskEngine {
     ): string | null {
 
         if (!valor) {
+
             return null;
         }
+
 
         const normalizado =
             valor
                 .trim()
                 .toUpperCase();
 
+
         if (
             normalizado.length === 0 ||
             normalizado === "NULL"
         ) {
+
             return null;
         }
+
 
         return normalizado;
     }

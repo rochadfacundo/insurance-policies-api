@@ -1,71 +1,158 @@
 import { Poliza } from "../../../models/poliza";
 import { ECompania } from "../../../models/eCompania";
-import { TipoVigencia } from "../../../models/tipoVigencia";
+
 import { FedPatCertificadoEndoso } from "../models/fedPatCertificadoEndoso";
-import { FedPatCertificadoSuma } from "../models/fedPatCertificadoSuma";
 import { FedPatProductor } from "../models/fedPatProductor";
 import { FedPatCliente } from "../models/fedPatCliente";
 import { FedPatCertificado } from "../models/fetPatCertificado";
+import { TipoRiesgo } from "../../../models/TipoRiesgo";
+import { DateUtils } from "../../../utils/dateUtils";
+
 
 /**
- * Datos previamente seleccionados necesarios para construir
- * una póliza normalizada del sistema.
+ * Datos previamente seleccionados y calculados necesarios para construir
+ * una póliza normalizada de Federación Patronal.
  *
- * Este contexto evita que FedPatPolizaMapper tenga que conocer
- * cómo se consultaron, agruparon o seleccionaron los movimientos
- * provenientes de los distintos endpoints de Federación Patronal.
+ * El mapper recibe información ya consolidada para evitar que esta capa
+ * tenga que interpretar feeds diarios, seleccionar movimientos, calcular
+ * importes o ejecutar reglas de detección de riesgos.
  */
 export interface FedPatPolizaMapperContext {
+
+    /**
+     * Certificado principal utilizado como cabecera de la póliza.
+     *
+     * Actualmente trabajamos con el certificado 0 como nivel principal
+     * para la información general de la póliza.
+     */
     certificado: FedPatCertificado;
+
+    /**
+     * Movimiento representativo utilizado para informar el período
+     * de facturación.
+     *
+     * La selección de este movimiento debe realizarse antes de invocar
+     * al mapper. El mapper no decide qué endoso es el correcto.
+     */
     endoso: FedPatCertificadoEndoso | null;
-    suma: FedPatCertificadoSuma | null;
+
+    /**
+     * Productor asociado al código informado en el certificado.
+     */
     productor: FedPatProductor;
+
+    /**
+     * Cliente previamente relacionado con el asegurado de la póliza.
+     *
+     * Puede ser null cuando la información histórica disponible no
+     * permite resolver el cliente.
+     */
     cliente: FedPatCliente | null;
+
+    /**
+     * Descripción de cobertura previamente resuelta.
+     *
+     * El mapper no interpreta códigos internos de cobertura de FedPat.
+     */
     cobertura: string | null;
+
+    /**
+     * Prima anual calculada por FedPatImportesService.
+     *
+     * null representa que no existe información suficiente para
+     * anualizar el importe de forma confiable.
+     */
+    primaAnual: number | null;
+
+    /**
+     * Premio anual calculado a partir de la relación premio/prima
+     * observada en la propia póliza.
+     */
+    premioAnual: number | null;
+
+    /**
+     * Riesgos de negocio ya determinados por FedPatRiskEngine.
+     *
+     * El mapper conserva exactamente los riesgos utilizados para
+     * decidir la persistencia de la póliza.
+     */
+    riesgos: TipoRiesgo[];
 }
 
 /**
- * Mapper responsable de transformar la información ya consolidada
- * de Federación Patronal al modelo común `Poliza` utilizado por
- * el módulo de riesgos.
+ * Mapper responsable de transformar información ya consolidada de
+ * Federación Patronal al modelo común `Poliza` utilizado por el sistema.
  *
  * Este mapper NO determina:
- * - cuál es el último movimiento de una póliza;
- * - qué certificado representa la cabecera;
- * - cuántos vehículos posee una póliza;
- * - qué riesgos deben asignarse.
  *
- * Esas decisiones pertenecen a la capa de procesamiento y al
- * RiskEngine respectivamente.
+ * - cuál es el certificado principal;
+ * - cuál es el movimiento de facturación representativo;
+ * - cuántos vehículos posee una póliza;
+ * - cómo se anualizan prima y premio;
+ * - qué riesgos corresponden a la póliza;
+ * - cómo se resuelve una cobertura.
+ *
+ * Todas esas decisiones deben llegar previamente resueltas.
  */
 export class FedPatPolizaMapper {
 
     /**
      * Convierte información consolidada de Federación Patronal
-     * al modelo normalizado de póliza.
+     * al modelo normalizado `Poliza`.
+     *
+     * @param context Información previamente seleccionada y calculada.
+     * @returns Póliza normalizada lista para ser procesada por la capa
+     *          de persistencia.
      */
     mapear(context: FedPatPolizaMapperContext): Poliza {
 
         const {
             certificado,
             endoso,
-            suma,
             productor,
             cliente,
-            cobertura
+            cobertura,
+            primaAnual,
+            premioAnual,
+            riesgos
         } = context;
 
+        /*
+         * Las fechas generales de vigencia pertenecen al certificado
+         * principal y representan el período contractual de la póliza.
+         */
         const vigenciaDesde = new Date(certificado.vigencia_desde);
-
         const vigenciaHasta = new Date(certificado.vigencia_hasta);
 
+        /*
+         * Cuando existe un movimiento representativo de facturación,
+         * utilizamos su período.
+         *
+         * Si no existe, conservamos temporalmente la vigencia general
+         * como fallback para mantener completo el modelo común.
+         *
+         * IMPORTANTE:
+         * El mapper no selecciona qué endoso representa la facturación.
+         * Esa decisión pertenece a la capa de procesamiento.
+         */
+        const facturacionDesde = endoso !== null
+            ? new Date(endoso.vigencia_desde)
+            : vigenciaDesde;
+
+        const facturacionHasta = endoso !== null
+            ? new Date(endoso.vigencia_hasta)
+            : vigenciaHasta;
+
         return {
+
             /*
-             * La identidad se construye a nivel póliza y no a nivel
-             * certificado. Los certificados pertenecientes a una misma
-             * póliza deben converger en el mismo documento.
+             * La identidad de Federación Patronal se construye utilizando
+             * ramo + número de póliza.
+             *
+             * No utilizamos únicamente numero_poliza porque un mismo número
+             * podría existir dentro de diferentes ramos.
              */
-            id: `FEDPAT_${certificado.numero_poliza}`,
+            id: `FEDPAT_${certificado.codigo_ramo}_${certificado.numero_poliza}`,
 
             compania: ECompania.FEDERACION_PATRONAL,
 
@@ -74,6 +161,11 @@ export class FedPatPolizaMapper {
                 nombre: productor.nombre
             },
 
+            /*
+             * El cliente puede no encontrarse en los feeds históricos
+             * disponibles. En ese caso conservamos explícitamente que
+             * el nombre no pudo ser informado.
+             */
             cliente: {
                 nombre: cliente?.nombre ?? "SIN INFORMAR"
             },
@@ -82,8 +174,9 @@ export class FedPatPolizaMapper {
                 numeroPoliza: certificado.numero_poliza,
 
                 /*
-                 * El endoso se incluye únicamente cuando previamente
-                 * se pudo determinar un movimiento representativo.
+                 * El número de endoso solamente se persiste cuando
+                 * previamente se pudo seleccionar un movimiento
+                 * representativo.
                  */
                 ...(endoso !== null
                     ? { endoso: endoso.endoso }
@@ -91,89 +184,68 @@ export class FedPatPolizaMapper {
             },
 
             riesgo: {
+
                 /*
-                 * Por el momento la cobertura se recibe ya resuelta.
-                 * El mapper no intenta inferirla desde códigos internos
-                 * de Federación.
+                 * La cobertura debe llegar previamente resuelta.
+                 * No inferimos descripciones desde códigos internos
+                 * dentro de esta capa.
                  */
                 cobertura: cobertura ?? "SIN INFORMAR",
 
                 /*
-                 * certificados-sumas es la fuente agregada disponible
-                 * para prima y premio a nivel certificado.
+                 * Los importes provienen del mismo cálculo anualizado
+                 * utilizado por el RiskEngine para detectar PRIMA_ALTA
+                 * y PREMIO_ALTO.
                  *
-                 * Conservamos 0 cuando el endpoint no informa el valor,
-                 * porque nuestro modelo común exige number.
+                 * De esta forma evitamos detectar un riesgo utilizando
+                 * un importe anual y posteriormente mostrar en la UI un
+                 * importe periódico diferente.
+                 *
+                 * El modelo común exige number, por lo que cuando no fue
+                 * posible calcular el importe se conserva 0.
                  */
-                premio: suma?.premio ?? 0,
-                prima: suma?.prima ?? 0
+                premio: premioAnual ?? 0,
+                prima: primaAnual ?? 0
             },
 
             /*
-             * Los riesgos de negocio se calculan posteriormente
-             * mediante FedPatRiskEngine.
+             * Los riesgos ya fueron determinados por FedPatRiskEngine.
+             *
+             * Creamos una nueva instancia del array para evitar compartir
+             * accidentalmente una referencia mutable con el resultado
+             * original del análisis.
              */
-            riesgos: [],
+            riesgos: [...riesgos],
 
+            /*
+             * El período de facturación se obtiene del movimiento que
+             * la capa de procesamiento haya seleccionado como
+             * representativo.
+             *
+             * No debe confundirse con la vigencia contractual general.
+             */
             facturacion: {
-                /*
-                 * Todavía no tenemos una fuente independiente de período
-                 * de facturación en el modelo normalizado. Conservamos
-                 * provisionalmente el período general del certificado.
-                 */
-                desde: vigenciaDesde,
-                hasta: vigenciaHasta
+                desde: facturacionDesde,
+                hasta: facturacionHasta
             },
 
+            /*
+             * La vigencia corresponde al período contractual informado
+             * por el certificado principal.
+             */
             vigencia: {
                 desde: vigenciaDesde,
                 hasta: vigenciaHasta,
 
-                diasParaVencer: this.calcularDiasParaVencer(vigenciaHasta),
-
-                tipo: this.obtenerTipoVigencia(vigenciaDesde, vigenciaHasta)
+                /*
+                * Los cálculos derivados de fechas se centralizan en DateUtils
+                * para mantener un único criterio compartido entre compañías.
+                */
+                diasParaVencer: DateUtils.calcularDiasParaVencer(vigenciaHasta),
+                tipo: DateUtils.calcularTipoVigencia(vigenciaDesde, vigenciaHasta)
             }
         };
     }
 
-    /**
-     * Calcula los días restantes hasta el vencimiento.
-     *
-     * El cálculo se realiza utilizando milisegundos y redondeo hacia
-     * arriba para conservar el día parcial como un día pendiente.
-     */
-    private calcularDiasParaVencer(fechaHasta: Date): number {
 
-        const ahora = new Date();
-
-        const diferencia = fechaHasta.getTime() - ahora.getTime();
-
-        const milisegundosPorDia = 1000 * 60 * 60 * 24;
-
-        return Math.ceil(diferencia / milisegundosPorDia);
-    }
-
-    /**
-     * Clasifica la vigencia utilizando la duración aproximada
-     * existente entre las fechas generales del certificado.
-     *
-     * Se utilizan rangos y no una cantidad exacta de días porque
-     * meses y años calendario poseen distinta duración.
-     */
-    private obtenerTipoVigencia(desde: Date,hasta: Date): TipoVigencia {
-
-        const diferencia = hasta.getTime() - desde.getTime();
-
-        const dias = diferencia / (1000 * 60 * 60 * 24);
-
-        if (dias >= 170 && dias <= 195) {
-            return TipoVigencia.SEMESTRAL;
-        }
-
-        if (dias >= 350 && dias <= 380) {
-            return TipoVigencia.ANUAL;
-        }
-
-        return TipoVigencia.OTRA;
-    }
 }

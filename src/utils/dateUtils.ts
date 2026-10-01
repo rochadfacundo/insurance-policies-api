@@ -2,6 +2,186 @@ import { TipoVigencia } from "../models/tipoVigencia";
 
 export class DateUtils {
 
+
+    
+
+
+    /**
+ * Convierte una fecha Date al formato dd/MM/yyyy.
+ *
+ * Este formato es utilizado, entre otros casos, por los endpoints
+ * diarios de cartera de Federación Patronal.
+ *
+ * @param fecha Fecha a formatear.
+ * @returns Fecha en formato dd/MM/yyyy.
+ */
+static formatearFechaDDMMYYYY(fecha: Date): string {
+
+    const dia =
+        String(fecha.getDate())
+            .padStart(2, "0");
+
+    const mes =
+        String(fecha.getMonth() + 1)
+            .padStart(2, "0");
+
+    const anio =
+        fecha.getFullYear();
+
+    return `${dia}/${mes}/${anio}`;
+}
+
+
+
+    /**
+     * Genera un arreglo de fechas en formato dd/MM/yyyy 
+     * @param desde Desde fecha de inicio en formato dd/MM/yyyy  
+     * @param hasta Hasta fecha de fin en formato dd/MM/yyyy
+     * @returns Arreglo de fechas en formato dd/MM/yyyy entre desde y hasta, inclusive. 
+     */
+    static generarFechas(desde: string,hasta: string): string[] {
+
+        const fechaDesde =
+            DateUtils.parsearFechaDDMMYYYY(
+                desde
+            );
+
+        const fechaHasta =
+            DateUtils.parsearFechaDDMMYYYY(
+                hasta
+            );
+
+        if (
+            fechaDesde.getTime() >
+            fechaHasta.getTime()
+        ) {
+            throw new Error(
+                "FECHA_DESDE no puede ser posterior a FECHA_HASTA."
+            );
+        }
+
+        const fechas: string[] = [];
+
+        const actual =
+            new Date(fechaDesde);
+
+        while (
+            actual.getTime() <=
+            fechaHasta.getTime()
+        ) {
+
+            fechas.push(
+                DateUtils.formatearFechaDDMMYYYY(
+                    actual
+                )
+            );
+
+            actual.setDate(
+                actual.getDate() + 1
+            );
+        }
+
+        return fechas;
+    }
+
+
+    /**
+     * Formatea cantidades enteras utilizando separadores locales.
+     *
+     * Se utiliza únicamente para mejorar la legibilidad de los logs
+     * del proceso.
+     */
+    static formatearNumero(valor: number): string {
+
+        return valor.toLocaleString("es-AR");
+    }
+
+
+
+    /**
+     * Convierte una fecha en formato dd/MM/yyyy a Date.
+     *
+     * La fecha se construye utilizando sus componentes numéricos
+     * para evitar depender de Date.parse() con formatos regionales.
+     *
+     * @param fecha Fecha en formato dd/MM/yyyy.
+     * @returns Fecha convertida a Date.
+     */
+    static parsearFechaDDMMYYYY(fecha: string): Date {
+
+        const partes =
+            fecha.split("/");
+
+        if (partes.length !== 3) {
+            throw new Error(
+                `Formato de fecha inválido: ${fecha}`
+            );
+        }
+
+        const dia =
+            Number(partes.at(0));
+
+        const mes =
+            Number(partes.at(1));
+
+        const anio =
+            Number(partes.at(2));
+
+        if (
+            !Number.isInteger(dia) ||
+            !Number.isInteger(mes) ||
+            !Number.isInteger(anio)
+        ) {
+            throw new Error(
+                `Formato de fecha inválido: ${fecha}`
+            );
+        }
+
+        const resultado =
+            new Date(
+                anio,
+                mes - 1,
+                dia
+            );
+
+        /*
+        * Verificamos nuevamente los componentes porque JavaScript
+        * normaliza automáticamente fechas inexistentes.
+        *
+        * Por ejemplo, new Date(2026, 1, 31) termina representando
+        * una fecha de marzo en lugar de lanzar un error.
+        */
+        if (
+            resultado.getFullYear() !== anio ||
+            resultado.getMonth() !== mes - 1 ||
+            resultado.getDate() !== dia
+        ) {
+            throw new Error(
+                `Fecha inválida: ${fecha}`
+            );
+        }
+
+        return resultado;
+    }
+
+
+    /**
+     * Resta una cantidad determinada de días a una fecha expresada
+     * en formato dd/MM/yyyy.
+     *
+     * @param fecha Fecha base en formato dd/MM/yyyy.
+     * @param dias Cantidad de días a restar.
+     * @returns Fecha resultante en formato dd/MM/yyyy.
+     */
+    static restarDiasDDMMYYYY(fecha: string,dias: number): string {
+
+        const resultado = this.parsearFechaDDMMYYYY(fecha);
+
+        resultado.setDate(resultado.getDate() - dias);
+
+        return this.formatearFechaDDMMYYYY(resultado);
+    }
+
     /**
      * Convierte un string YYYY-MM-DD a Date.
      */

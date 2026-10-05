@@ -1,87 +1,34 @@
 import * as path from "path";
 import * as dotenv from "dotenv";
 
-import {
-    FedPatPolizaState
-} from "../src/companias/fed-pat/models/fedPatPolizaState";
+import {FedPatPolizaState} from "../src/companias/fed-pat/models/fedPatPolizaState";
 
-import {
-    FedPatFeedDiario,
-    FedPatPolizaStateService
-} from "../src/companias/fed-pat/services/fedPatPolizaStateService";
-
-import {
-    FedPatAuthService
-} from "../src/companias/fed-pat/services/fedPatAuthService";
-
-import {
-    FedPatCertificadosService
-} from "../src/companias/fed-pat/services/fedPatCertificadosService";
-
-import {
-    FedPatCertificadosEndososService
-} from "../src/companias/fed-pat/services/fedPatCertificadosEndososService";
-
-import {
-    FedPatCertificadosSumasService
-} from "../src/companias/fed-pat/services/fedPatCertificadosSumarService";
-
-import {
-    FedPatProductosDatosService
-} from "../src/companias/fed-pat/services/fedPatProductosDatosService";
-
-import {
-    FedPatRiesgosCubiertosService
-} from "../src/companias/fed-pat/services/fedPatRiesgosCubiertosService";
-
-import {
-    FedPatCertificadosComponentesService
-} from "../src/companias/fed-pat/services/fedPatCertificadosComponentesService";
-
-import {
-    FedPatDatosService
-} from "../src/companias/fed-pat/services/fedPatDatosService";
-
-import {
-    FedPatTablasService
-} from "../src/companias/fed-pat/services/fedPatTablasService";
-
-import {
-    FedPatRiskEngine
-} from "../src/companias/fed-pat/services/fedPatRiskEngine";
-
-import {
-    FedPatClientesService
-} from "../src/companias/fed-pat/services/fedPatClientesService";
-
-import {
-    FedPatProductoresService
-} from "../src/companias/fed-pat/services/fedPatProductoresService";
-
-import {
-    FedPatPolizaContextService
-} from "../src/companias/fed-pat/services/fetPatPolizaMapperContext";
-
-import {
-    FedPatCliente
-} from "../src/companias/fed-pat/models/fedPatCliente";
-
-import {
-    TipoRiesgo
-} from "../src/models/TipoRiesgo";
-
-import {
-    DateUtils
-} from "../src/utils/dateUtils";
+import {FedPatFeedDiario, FedPatPolizaStateService} from "../src/companias/fed-pat/services/fedPatPolizaStateService";
+import {FedPatAuthService} from "../src/companias/fed-pat/services/fedPatAuthService";
+import {FedPatCertificadosService} from "../src/companias/fed-pat/services/fedPatCertificadosService";
+import {FedPatCertificadosEndososService} from "../src/companias/fed-pat/services/fedPatCertificadosEndososService";
+import {FedPatCertificadosSumasService} from "../src/companias/fed-pat/services/fedPatCertificadosSumarService";
+import {FedPatProductosDatosService} from "../src/companias/fed-pat/services/fedPatProductosDatosService";
+import {FedPatRiesgosCubiertosService} from "../src/companias/fed-pat/services/fedPatRiesgosCubiertosService";
+import {FedPatCertificadosComponentesService} from "../src/companias/fed-pat/services/fedPatCertificadosComponentesService";
+import {FedPatDatosService} from "../src/companias/fed-pat/services/fedPatDatosService";
+import {FedPatTablasService} from "../src/companias/fed-pat/services/fedPatTablasService";
+import {FedPatRiskEngine} from "../src/companias/fed-pat/services/fedPatRiskEngine";
+import {FedPatClientesService} from "../src/companias/fed-pat/services/fedPatClientesService";
+import {FedPatProductoresService} from "../src/companias/fed-pat/services/fedPatProductoresService";
 import { FedPatFacturacionService } from "../src/companias/fed-pat/services/fedPatFacturacionService";
-import { FedPatPolizaMapper } from "../src/companias/fed-pat/mappers/fedPatPolizaMapper";
+import {FedPatPolizaContextService} from "../src/companias/fed-pat/services/fetPatPolizaMapperContext";
 import { FedPatPlanesService } from "../src/companias/fed-pat/services/fedPatPlanesService";
+
+import {FedPatCliente} from "../src/companias/fed-pat/models/fedPatCliente";
+import { TipoRiesgo } from "../src/models/TipoRiesgo";
+import { DateUtils }  from "../src/utils/dateUtils";
+import { ECompania } from "../src/models/eCompania";
+
+import { FedPatPolizaMapper } from "../src/companias/fed-pat/mappers/fedPatPolizaMapper";
 import { FedPatCoberturaResolve } from "../src/companias/fed-pat/services/fedPatCoberturaResolve";
 import { Poliza } from "../src/models/poliza";
 import { FirestorePolizaRepository } from "../src/repositories/firestorePolizaRepository";
-import { ECompania } from "../src/models/eCompania";
-
-
 
 
 /**
@@ -91,14 +38,7 @@ import { ECompania } from "../src/models/eCompania";
  * El script se ejecuta desde /scripts, por lo que el archivo .env
  * se encuentra un nivel por encima.
  */
-dotenv.config({
-    path: path.resolve(
-        process.cwd(),
-        "../.env"
-    )
-});
-
-
+dotenv.config({ path: path.resolve(process.cwd(),"../.env")});
 
 /**
  * Habilita o deshabilita la persistencia de los riesgos
@@ -165,35 +105,17 @@ async function main(): Promise<void> {
 
     const endososService = new FedPatCertificadosEndososService(authService);
 
-    const sumasService =
-        new FedPatCertificadosSumasService(
-            authService
-        );
+    const sumasService = new FedPatCertificadosSumasService(authService);
 
-    const productosDatosService =
-        new FedPatProductosDatosService(
-            authService
-        );
+    const productosDatosService = new FedPatProductosDatosService(authService);
 
-    const riesgosCubiertosService =
-        new FedPatRiesgosCubiertosService(
-            authService
-        );
+    const riesgosCubiertosService = new FedPatRiesgosCubiertosService(authService);
 
-    const componentesService =
-        new FedPatCertificadosComponentesService(
-            authService
-        );
+    const componentesService = new FedPatCertificadosComponentesService(authService);
 
-    const datosService =
-        new FedPatDatosService(
-            authService
-        );
+    const datosService = new FedPatDatosService(authService);
 
-    const tablasService =
-        new FedPatTablasService(
-            authService
-        );
+    const tablasService = new FedPatTablasService(authService);
 
     /*
      * Los clientes se obtienen mediante feeds diarios.
@@ -202,10 +124,7 @@ async function main(): Promise<void> {
      * porque posteriormente se utilizan para resolver el asegurado
      * asociado al certificado principal.
      */
-    const clientesService =
-        new FedPatClientesService(
-            authService
-        );
+    const clientesService = new FedPatClientesService(authService);
 
     /**
      * El catálogo de productores no depende de una fecha.
@@ -213,10 +132,7 @@ async function main(): Promise<void> {
      * Por ese motivo se consulta una única vez una vez finalizada
      * la reconstrucción histórica.
      */
-    const productoresService =
-        new FedPatProductoresService(
-            authService
-        );
+    const productoresService = new FedPatProductoresService(authService);
 
     /**
      * Servicio encargado de resolver la información necesaria
@@ -225,15 +141,13 @@ async function main(): Promise<void> {
      * Las decisiones de selección se mantienen fuera del main
      * y fuera de FedPatPolizaMapper.
      */
-    const contextService =
-        new FedPatPolizaContextService();
+    const contextService = new FedPatPolizaContextService();
 
     /*
      * Servicio encargado de reconstruir el estado acumulado conocido
      * de cada póliza a partir de los movimientos diarios.
      */
-    const stateService =
-        new FedPatPolizaStateService();
+    const stateService = new FedPatPolizaStateService();
 
     /*
      * Motor que aplica las reglas de negocio:
@@ -242,8 +156,7 @@ async function main(): Promise<void> {
      * - PRIMA_ALTA
      * - PREMIO_ALTO
      */
-    const riskEngine =
-        new FedPatRiskEngine();
+    const riskEngine = new FedPatRiskEngine();
 
     /*
     * Servicio encargado de resolver el movimiento representativo
@@ -329,14 +242,9 @@ async function main(): Promise<void> {
      * consultarse en paralelo porque representan fuentes independientes
      * del mismo feed diario.
      */
-    for (
-        let indice = 0;
-        indice < fechas.length;
-        indice++
-    ) {
+    for (let indice = 0; indice < fechas.length; indice++) {
 
-        const fecha =
-            fechas.at(indice);
+        const fecha = fechas.at(indice);
 
         /*
          * Con noUncheckedIndexedAccess evitamos asumir que el acceso
@@ -747,8 +655,7 @@ async function main(): Promise<void> {
              * Seleccionamos únicamente las pólizas riesgosas
              * correspondientes al productor actual.
              */
-            const riesgosProductor = polizasConRiesgo.filter(
-                poliza =>
+            const riesgosProductor = polizasConRiesgo.filter(poliza =>
                     poliza.productor.codigo === productor.codigo
             );
         
@@ -770,18 +677,11 @@ async function main(): Promise<void> {
                     ECompania.FEDERACION_PATRONAL,
                     riesgosProductor
                 );
-        
-            riesgosActualesFirestore +=
-                resultadoFirestore.riesgosActuales;
-        
-            riesgosNuevosFirestore +=
-                resultadoFirestore.riesgosNuevos;
-        
-            riesgosActualizadosFirestore +=
-                resultadoFirestore.riesgosActualizados;
-        
-            riesgosEliminadosFirestore +=
-                resultadoFirestore.riesgosEliminados;
+
+            riesgosActualesFirestore += resultadoFirestore.riesgosActuales;
+            riesgosNuevosFirestore += resultadoFirestore.riesgosNuevos;
+            riesgosActualizadosFirestore += resultadoFirestore.riesgosActualizados;
+            riesgosEliminadosFirestore += resultadoFirestore.riesgosEliminados;
         } 
     }
       

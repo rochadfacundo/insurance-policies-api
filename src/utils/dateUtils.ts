@@ -84,6 +84,43 @@ static formatearFechaDDMMYYYY(fecha: Date): string {
         return fechas;
     }
 
+    /**
+     * Determina si una fecha de vigencia ya finalizó respecto
+     * de la fecha actual.
+     *
+     * La comparación se realiza a nivel calendario, ignorando
+     * la hora para evitar diferencias producidas por timezone.
+     *
+     * @param fechaHasta fecha final en formato YYYY-MM-DD.
+     * @returns true cuando la fecha de vigencia es anterior al día actual.
+     */
+    static estaVencida(fechaHasta: string): boolean {
+
+        const [anioTexto, mesTexto, diaTexto] = fechaHasta.split("-");
+
+        const anio = Number(anioTexto);
+        const mes = Number(mesTexto);
+        const dia = Number(diaTexto);
+
+        if (!Number.isFinite(anio) || !Number.isFinite(mes) || !Number.isFinite(dia)) {
+            return false;
+        }
+
+        const fechaFin = new Date(
+            anio,
+            mes - 1,
+            dia
+        );
+
+        fechaFin.setHours(0, 0, 0, 0);
+
+        const hoy = new Date();
+
+        hoy.setHours(0, 0, 0, 0);
+
+        return fechaFin.getTime() < hoy.getTime();
+    }
+
 
     /**
      * Formatea cantidades enteras utilizando separadores locales.

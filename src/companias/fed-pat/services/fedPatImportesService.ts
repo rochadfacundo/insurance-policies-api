@@ -112,31 +112,134 @@ export class FedPatImportesService {
         const cantidadFacturacion = certificadoPrincipal.cant_facturacion;
 
         /*
-         * Por ahora solamente procesamos facturación tipo D.
-         *
-         * T/2 queda deliberadamente excluido hasta disponer de una muestra
-         * suficiente para validar su comportamiento.
-         */
+        * Facturación T/2.
+        *
+        * En las pólizas T/2 analizadas, certificados-sumas del certificado 0
+        * informa la prima y el premio consolidados de la póliza.
+        *
+        * A diferencia de las reglas tipo D:
+        *
+        * - no multiplicamos una cuota por la cantidad de facturaciones;
+        * - no sumamos movimientos R/F/N/A;
+        * - no utilizamos un endoso individual como fuente económica.
+        *
+        * Esto evita reconstruir un importe que Federación ya informa
+        * consolidado en certificados-sumas.
+        */
+        if (
+            tipoFacturacion === "T" &&
+            cantidadFacturacion === 2
+        ) {
+            return this.calcularImportesTipoT2(
+                estado
+            );
+        }
+
+        /*
+        * Las reglas históricamente validadas para tipo D se mantienen
+        * sin modificaciones.
+        */
         if (tipoFacturacion !== "D") {
             return this.sinImportes();
         }
 
-        if (cantidadFacturacion !== 2 && cantidadFacturacion !== 3 && cantidadFacturacion !== 12) {
+        if (
+            cantidadFacturacion !== 2 &&
+            cantidadFacturacion !== 3 &&
+            cantidadFacturacion !== 12
+        ) {
             return this.sinImportes();
         }
 
-        const primaCalculada = this.calcularPrimaTipoD(estado, cantidadFacturacion);
+        const primaCalculada =
+            this.calcularPrimaTipoD(
+                estado,
+                cantidadFacturacion
+            );
 
         if (primaCalculada === null) {
             return this.sinImportes();
         }
 
-        const premioAnual = this.calcularPremioAnual(estado,primaCalculada.primaAnual);
+        const premioAnual =
+            this.calcularPremioAnual(
+                estado,
+                primaCalculada.primaAnual
+            );
 
         return {
             primaAnual: primaCalculada.primaAnual,
             premioAnual,
             endosoFacturacion: primaCalculada.endoso
+        };
+    }
+
+    /**
+     * Obtiene los importes consolidados de una póliza con
+     * facturación T/2.
+     *
+     * Los diagnósticos realizados sobre pólizas T/2 completas mostraron
+     * que certificados-sumas del certificado 0 conserva los importes
+     * consolidados de prima y premio independientemente de los movimientos
+     * individuales R, F, N o A.
+     *
+     * Por este motivo no reconstruimos el importe mediante endosos ni
+     * multiplicamos una cuota semestral por dos.
+     *
+     * El endoso de facturación se mantiene en null porque, para T/2,
+     * certificados-sumas es la fuente económica y no un movimiento
+     * individual. La resolución del período de facturación debe tratarse
+     * independientemente.
+     */
+    private calcularImportesTipoT2(
+        estado: FedPatPolizaState
+    ): FedPatImportesAnuales {
+
+        const sumaPrincipal =
+            this.obtenerSumaCertificadoPrincipal(
+                estado
+            );
+
+        if (sumaPrincipal === null) {
+            return this.sinImportes();
+        }
+
+        const prima =
+            sumaPrincipal.prima;
+
+        const premio =
+            sumaPrincipal.premio;
+
+        /*
+        * Sin una prima positiva no consideramos que exista evidencia
+        * suficiente para informar un importe económico.
+        */
+        if (
+            prima === null ||
+            prima === undefined ||
+            !Number.isFinite(prima) ||
+            prima <= 0
+        ) {
+            return this.sinImportes();
+        }
+
+        /*
+        * El premio puede no estar informado aun cuando exista una prima
+        * válida. En ese caso conservamos la prima y representamos
+        * explícitamente la ausencia del premio mediante null.
+        */
+        const premioValido =
+            premio !== null &&
+            premio !== undefined &&
+            Number.isFinite(premio) &&
+            premio > 0
+                ? premio
+                : null;
+
+        return {
+            primaAnual: prima,
+            premioAnual: premioValido,
+            endosoFacturacion: null
         };
     }
 

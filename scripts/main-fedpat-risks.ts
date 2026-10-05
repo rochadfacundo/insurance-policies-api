@@ -74,6 +74,14 @@ import {
     DateUtils
 } from "../src/utils/dateUtils";
 import { FedPatFacturacionService } from "../src/companias/fed-pat/services/fedPatFacturacionService";
+import { FedPatPolizaMapper } from "../src/companias/fed-pat/mappers/fedPatPolizaMapper";
+import { FedPatPlanesService } from "../src/companias/fed-pat/services/fedPatPlanesService";
+import { FedPatCoberturaResolve } from "../src/companias/fed-pat/services/fedPatCoberturaResolve";
+import { Poliza } from "../src/models/poliza";
+import { FirestorePolizaRepository } from "../src/repositories/firestorePolizaRepository";
+import { ECompania } from "../src/models/eCompania";
+
+
 
 
 /**
@@ -91,6 +99,21 @@ dotenv.config({
 });
 
 
+
+/**
+ * Habilita o deshabilita la persistencia de los riesgos
+ * detectados en Firestore.
+ *
+ * false:
+ * ejecuta todo el proceso de reconstrucción y análisis,
+ * pero no modifica ninguna colección.
+ *
+ * true:
+ * sincroniza los riesgos actuales de Federación Patronal
+ * contra la colección `polizas`.
+ */
+const ESCRIBIR_FIRESTORE = true;
+
 /**
  * Rango histórico utilizado para reconstruir la cartera.
  *
@@ -99,20 +122,8 @@ dotenv.config({
  *
  * A partir de esa fecha se reconstruyen los últimos 365 días.
  */
-const FECHA_HASTA =
-    DateUtils.restarDiasDDMMYYYY(
-        DateUtils.formatearFechaDDMMYYYY(
-            new Date()
-        ),
-        1
-    );
-
-const FECHA_DESDE =
-    DateUtils.restarDiasDDMMYYYY(
-        FECHA_HASTA,
-        365
-    );
-
+const FECHA_HASTA = DateUtils.restarDiasDDMMYYYY(DateUtils.formatearFechaDDMMYYYY(new Date()), 1);
+const FECHA_DESDE = DateUtils.restarDiasDDMMYYYY(FECHA_HASTA, 365);
 
 /**
  * Punto de entrada del bootstrap histórico de riesgos
@@ -132,52 +143,27 @@ const FECHA_DESDE =
  *          ↓
  * pólizas con riesgo
  *
- * IMPORTANTE:
- *
- * Esta versión no inicializa Firebase Admin ni utiliza repositorios
- * Firestore.
- *
- * Los registros técnicos obtenidos desde Federación existen solamente
- * durante la ejecución del proceso y no son persistidos.
  */
 async function main(): Promise<void> {
 
     const inicio = Date.now();
 
 
-    console.log(
-        "=================================================="
-    );
-
-    console.log(
-        "SINCRONIZACIÓN DE RIESGOS FEDERACIÓN PATRONAL"
-    );
-
-    console.log(
-        "=================================================="
-    );
-
-    console.log(
-        `Período: ${FECHA_DESDE} -> ${FECHA_HASTA}`
-    );
-
+    console.log("==================================================");
+    console.log("SINCRONIZACIÓN DE RIESGOS FEDERACIÓN PATRONAL");
+    console.log("==================================================");
+    console.log(`Período: ${FECHA_DESDE} -> ${FECHA_HASTA}`);
+    console.log(`Escribir Firestore: ${ESCRIBIR_FIRESTORE}`);
 
     /*
      * Todos los servicios de Federación comparten la misma instancia
      * de autenticación.
      */
-    const authService =
-        new FedPatAuthService();
+    const authService = new FedPatAuthService();
 
-    const certificadosService =
-        new FedPatCertificadosService(
-            authService
-        );
+    const certificadosService = new FedPatCertificadosService(authService);
 
-    const endososService =
-        new FedPatCertificadosEndososService(
-            authService
-        );
+    const endososService = new FedPatCertificadosEndososService(authService);
 
     const sumasService =
         new FedPatCertificadosSumasService(
@@ -269,14 +255,45 @@ async function main(): Promise<void> {
     const facturacionService = new FedPatFacturacionService();
 
     /*
+    * Mapper encargado de transformar el contexto ya resuelto
+    * de Federación Patronal al modelo normalizado Poliza.
+    *
+    * El mapper no aplica reglas de riesgo ni decide qué movimiento
+    * representa la facturación; recibe esas decisiones ya resueltas
+    * por los servicios correspondientes.
+    */
+    const polizaMapper = new FedPatPolizaMapper();
+
+    /*
+    * El catálogo de planes permite traducir la combinación
+    * `codigo_producto + codigo_plan` informada en los endosos
+    * a una descripción comercial legible.
+    *
+    * El resolver trabaja exclusivamente con información ya cargada
+    * en memoria y no realiza consultas adicionales a la API.
+    */
+    const planesService = new FedPatPlanesService(authService);
+
+    const coberturaResolveService = new FedPatCoberturaResolve();
+
+    /**
+     * El repositorio solamente se instancia cuando la escritura
+     * está habilitada, evitando inicializar Firestore durante
+     * ejecuciones puramente diagnósticas.
+     */
+    const polizaRepository = ESCRIBIR_FIRESTORE
+        ? new FirestorePolizaRepository()
+        : null;
+
+
+    /*
      * Los estados RAW viven únicamente en memoria.
      *
      * La clave interna utilizada por FedPatPolizaStateService es:
      *
      * ramo + número de póliza.
      */
-    const estados =
-        new Map<string, FedPatPolizaState>();
+    const estados = new Map<string, FedPatPolizaState>();
 
     /*
      * Catálogo histórico de clientes reconstruido en memoria.
@@ -287,32 +304,21 @@ async function main(): Promise<void> {
      *
      * Los clientes no se persisten como información RAW.
      */
-    const clientes =
-        new Map<string, FedPatCliente>();
+    const clientes = new Map<string, FedPatCliente>();
 
 
     /*
      * DateUtils genera todas las fechas del rango incluyendo
      * FECHA_DESDE y FECHA_HASTA.
      */
-    const fechas =
-        DateUtils.generarFechas(
-            FECHA_DESDE,
-            FECHA_HASTA
-        );
+    const fechas = DateUtils.generarFechas(FECHA_DESDE,FECHA_HASTA);
 
 
     console.log("");
-
-    console.log(
-        `Días a consultar: ${DateUtils.formatearNumero(fechas.length)}`
-    );
+    console.log(`Días a consultar: ${DateUtils.formatearNumero(fechas.length)}`);
 
     console.log("");
-
-    console.log(
-        "Reconstruyendo cartera histórica..."
-    );
+    console.log("Reconstruyendo cartera histórica...");
 
 
     /*
@@ -356,40 +362,13 @@ async function main(): Promise<void> {
             clientesFecha
         ] = await Promise.all([
 
-            certificadosService
-                .obtenerCertificados(
-                    fecha
-                ),
-
-            endososService
-                .obtenerEndosos(
-                    fecha
-                ),
-
-            sumasService
-                .obtenerCertificadosSumas(
-                    fecha
-                ),
-
-            productosDatosService
-                .obtenerProductosDatos(
-                    fecha
-                ),
-
-            riesgosCubiertosService
-                .obtenerRiesgosCubiertos(
-                    fecha
-                ),
-
-            componentesService
-                .obtenerCertificadosComponentes(
-                    fecha
-                ),
-
-            clientesService
-                .obtenerClientes(
-                    fecha
-                )
+            certificadosService.obtenerCertificados(fecha),
+            endososService.obtenerEndosos(fecha),
+            sumasService.obtenerCertificadosSumas(fecha),
+            productosDatosService.obtenerProductosDatos(fecha),
+            riesgosCubiertosService.obtenerRiesgosCubiertos(fecha),
+            componentesService.obtenerCertificadosComponentes(fecha),
+            clientesService.obtenerClientes(fecha)
 
         ]);
 
@@ -411,17 +390,13 @@ async function main(): Promise<void> {
             componentes
         };
 
-
         /*
          * El StateService incorpora los movimientos al estado acumulado.
          *
          * Los registros repetidos se reemplazan utilizando sus claves
          * naturales, evitando duplicaciones durante reprocesamientos.
          */
-        stateService.acumularFeed(
-            estados,
-            feed
-        );
+        stateService.acumularFeed(estados, feed);
 
 
         /*
@@ -433,52 +408,24 @@ async function main(): Promise<void> {
          * cronológicamente, al finalizar conservamos la información más
          * reciente conocida dentro del período consultado.
          */
-        for (
-            const cliente of clientesFecha
-        ) {
+        for (const cliente of clientesFecha) {
 
-            const claveCliente =
-                `${cliente.tipo_asegurado}-${cliente.codigo}`;
+            const claveCliente = `${cliente.tipo_asegurado}-${cliente.codigo}`;
 
-            clientes.set(
-                claveCliente,
-                cliente
-            );
+            clientes.set(claveCliente, cliente);
         }
 
-
-        console.log(
-            `   Estados acumulados: ${DateUtils.formatearNumero(estados.size)}`
-        );
-
-        console.log(
-            `   Clientes acumulados: ${DateUtils.formatearNumero(clientes.size)}`
-        );
+        console.log(`Estados acumulados: ${DateUtils.formatearNumero(estados.size)}`);
+        console.log(`Clientes acumulados: ${DateUtils.formatearNumero(clientes.size)}`);
     }
 
 
     console.log("");
-
-    console.log(
-        "=================================================="
-    );
-
-    console.log(
-        "CARTERA RECONSTRUIDA"
-    );
-
-    console.log(
-        "=================================================="
-    );
-
-    console.log(
-        `Estados acumulados: ${DateUtils.formatearNumero(estados.size)}`
-    );
-
-    console.log(
-        `Clientes acumulados: ${DateUtils.formatearNumero(clientes.size)}`
-    );
-
+    console.log("==================================================");
+    console.log("CARTERA RECONSTRUIDA");
+    console.log("==================================================");
+    console.log(`Estados acumulados: ${DateUtils.formatearNumero(estados.size)}`);
+    console.log(`Clientes acumulados: ${DateUtils.formatearNumero(clientes.size)}`);
 
     /*
      * El catálogo de productores se consulta una única vez después
@@ -490,16 +437,11 @@ async function main(): Promise<void> {
      */
     console.log("");
 
-    console.log(
-        "Obteniendo catálogo de productores..."
-    );
+    console.log("Obteniendo catálogo de productores...");
 
-    const productores =
-        await productoresService.obtenerProductores();
+    const productores = await productoresService.obtenerProductores();
 
-    console.log(
-        `Productores obtenidos: ${DateUtils.formatearNumero(productores.length)}`
-    );
+    console.log(`Productores obtenidos: ${DateUtils.formatearNumero(productores.length)}`);
     
 
 
@@ -513,31 +455,30 @@ async function main(): Promise<void> {
      * final del período que acabamos de reconstruir.
      */
     console.log("");
+    console.log("Obteniendo catálogo de datos...");
 
-    console.log(
-        "Obteniendo catálogo de datos..."
-    );
+    const datos = await datosService.obtenerDatos();
 
-    const datos =
-        await datosService.obtenerDatos();
+    console.log(`Datos obtenidos: ${DateUtils.formatearNumero(datos.length)}`);
+    console.log(`Obteniendo tablas para ${FECHA_HASTA}...`);
 
-    console.log(
-        `Datos obtenidos: ${DateUtils.formatearNumero(datos.length)}`
-    );
+    const tablas = await tablasService.obtenerTablas(FECHA_HASTA);
 
+    console.log(`Tablas obtenidas: ${DateUtils.formatearNumero(tablas.length)}`);
 
-    console.log(
-        `Obteniendo tablas para ${FECHA_HASTA}...`
-    );
+    /*
+    * Los planes constituyen un catálogo global y no dependen
+    * de una fecha de cartera.
+    *
+    * Se consultan una única vez y posteriormente se reutilizan
+    * para resolver las coberturas de todas las pólizas con riesgo.
+    */
+    console.log("");
+    console.log("Obteniendo catálogo de planes...");
 
-    const tablas =
-        await tablasService.obtenerTablas(
-            FECHA_HASTA
-        );
+    const planes = await planesService.obtenerPlanes();
 
-    console.log(
-        `Tablas obtenidas: ${DateUtils.formatearNumero(tablas.length)}`
-    );
+    console.log(`Planes obtenidos: ${DateUtils.formatearNumero(planes.length)}`);
 
 
     /*
@@ -547,10 +488,18 @@ async function main(): Promise<void> {
      * por lo que evitamos reconstruir el array para cada póliza
      * analizada.
      */
-    const clientesDisponibles =
-        Array.from(
-            clientes.values()
-        );
+    const clientesDisponibles = Array.from(clientes.values());
+
+    /**
+     * Pólizas normalizadas que presentan al menos un riesgo.
+     *
+     * Esta colección representa el resultado final del procesamiento
+     * de Federación Patronal y será utilizada posteriormente para
+     * sincronizar la colección de riesgos en Firestore.
+     *
+     * En esta etapa se mantiene exclusivamente en memoria.
+     */
+    const polizasConRiesgo: Poliza[] = [];
 
 
     /*
@@ -568,106 +517,58 @@ async function main(): Promise<void> {
 
 
     console.log("");
-
-    console.log(
-        "=================================================="
-    );
-
-    console.log(
-        "ANALIZANDO RIESGOS"
-    );
-
-    console.log(
-        "=================================================="
-    );
-
+    console.log("==================================================");
+    console.log("ANALIZANDO RIESGOS");
+    console.log("==================================================");
     console.log("");
 
+  
+    
 
     /*
      * Las reglas de negocio se ejecutan una vez reconstruido el estado
      * histórico de todas las pólizas.
      */
-    for (
-        const estado of estados.values()
-    ) {
+    for (const estado of estados.values()) {
 
-        const analisis =
-            riskEngine.analizar(
-                estado,
-                datos,
-                tablas
-            );
+
+        /**
+         * Antes de analizar riesgos resolvemos el certificado principal
+         * y descartamos pólizas cuya vigencia contractual ya finalizó.
+         *
+         * Los estados históricos permanecen disponibles en memoria para
+         * reconstruir la cartera, pero no deben participar del conjunto
+         * de riesgos actuales.
+         */
+        const certificado = contextService.obtenerCertificadoPrincipal(estado);
+
+        if (certificado === null) {
+
+            console.warn(`⚠ ${estado.codigoRamo}/${estado.numeroPoliza} ` +"sin certificado principal");
+
+            continue;
+        }
+
+        if (DateUtils.estaVencida(certificado.vigencia_hasta)) {
+            continue;
+        }
+
+
+        const analisis = riskEngine.analizar(estado, datos, tablas);
 
 
         /*
          * Las pólizas sin riesgos no forman parte de nuestra colección
          * normalizada de riesgos.
          */
-        if (
-            analisis.riesgos.length === 0
-        ) {
+        if (analisis.riesgos.length === 0) {
 
             sinRiesgo++;
-
             continue;
         }
 
 
         conRiesgo++;
-
-        /*
-        * Diagnóstico temporal de los movimientos disponibles para la póliza.
-        *
-        * Permite analizar cómo factura Federación Patronal las pólizas FLOTA
-        * para las cuales FedPatImportesService no pudo resolver actualmente
-        * un movimiento de facturación.
-        *
-        * Los endosos se ordenan únicamente para facilitar la inspección.
-        * Este bloque no participa de ninguna decisión de negocio.
-        */
-        const endososOrdenados = [...estado.endosos]
-            .sort((a, b) => a.endoso - b.endoso);
-
-        console.log(
-            `\nENDOSOS ${estado.codigoRamo}/${estado.numeroPoliza}`
-        );
-
-        for (const endoso of endososOrdenados) {
-            console.log(
-                `  #${endoso.endoso} | ` +
-                `Tipo: ${endoso.tipo_endoso} | ` +
-                `Emisión: ${endoso.fecha_emision} | ` +
-                `Vigencia: ${endoso.vigencia_desde} -> ${endoso.vigencia_hasta} | ` +
-                `Prima: ${endoso.prima}`
-            );
-        }
-
-
-
-        /*
-         * A partir de este punto solamente procesamos pólizas que
-         * contienen al menos un riesgo de negocio.
-         *
-         * Primero resolvemos el certificado principal utilizado como
-         * cabecera de la póliza normalizada.
-         */
-        const certificado =
-            contextService.obtenerCertificadoPrincipal(
-                estado
-            );
-
-        if (
-            certificado === null
-        ) {
-
-            console.warn(
-                `⚠ ${estado.codigoRamo}/${estado.numeroPoliza} ` +
-                "sin certificado principal"
-            );
-
-            continue;
-        }
 
         /*
         * Resolvemos independientemente el movimiento que representa
@@ -676,7 +577,7 @@ async function main(): Promise<void> {
         * Este movimiento no depende del utilizado por ImportesService
         * para calcular prima o premio anualizados.
         */
-        const endosoFacturacion =facturacionService.obtenerEndosoFacturacion(estado);
+        const endosoFacturacion = facturacionService.obtenerEndosoFacturacion(estado);
 
 
         /*
@@ -686,21 +587,10 @@ async function main(): Promise<void> {
          * La ausencia de productor sí impide construir correctamente
          * la póliza normalizada.
          */
-        const productor =
-            contextService.obtenerProductor(
-                certificado,
-                productores
-            );
+        const productor = contextService.obtenerProductor(certificado, productores);
 
-        if (
-            productor === null
-        ) {
-
-            console.warn(
-                `⚠ ${estado.codigoRamo}/${estado.numeroPoliza} ` +
-                `sin productor ${certificado.codigo_productor}`
-            );
-
+        if (productor === null) {
+            console.warn(`${estado.codigoRamo}/${estado.numeroPoliza} ` + `sin productor ${certificado.codigo_productor}`);
             continue;
         }
 
@@ -709,11 +599,7 @@ async function main(): Promise<void> {
          * El cliente se relaciona utilizando tipo_asegurado +
          * codigo_asegurado del certificado principal.
          */
-        const cliente =
-            contextService.obtenerCliente(
-                certificado,
-                clientesDisponibles
-            );
+        const cliente = contextService.obtenerCliente(certificado,clientesDisponibles);
 
 
         /*
@@ -723,9 +609,7 @@ async function main(): Promise<void> {
          * puede utilizar un valor por defecto. Por ahora registramos
          * el caso para validar la calidad del catálogo histórico.
          */
-        if (
-            cliente === null
-        ) {
+        if (cliente === null) {
 
             console.warn(
                 `⚠ ${estado.codigoRamo}/${estado.numeroPoliza} ` +
@@ -736,118 +620,191 @@ async function main(): Promise<void> {
 
 
         /*
-        * Diagnóstico temporal del contexto resuelto y del movimiento
-        * de facturación seleccionado para cada póliza con riesgo.
+        * Resolvemos las descripciones comerciales de los planes
+        * presentes en los endosos acumulados de la póliza.
         *
-        * endosoFacturacion corresponde exactamente al movimiento utilizado
-        * por FedPatImportesService para calcular los importes anualizados.
+        * Una flota puede contener certificados con planes diferentes,
+        * por lo que el resolver devuelve las descripciones únicas
+        * encontradas en lugar de asumir una cobertura principal.
         *
-        * Todavía no construimos Poliza ni escribimos en Firestore.
+        * Esta resolución es informativa y no participa de los cálculos
+        * de prima, premio ni de la detección de riesgos.
         */
-        console.log(
-            `${estado.codigoRamo}/${estado.numeroPoliza} -> ` +
-            `${analisis.riesgos.join(", ")} | ` +
-            `Productor: ${productor.codigo} - ${productor.nombre} | ` +
-            `Cliente: ${cliente?.nombre ?? "SIN INFORMAR"} | ` +
-            `Facturación certificado: ${certificado.tipo_facturacion ?? "SIN INFORMAR"} | ` +
-            `Cantidad: ${certificado.cant_facturacion ?? "SIN INFORMAR"} | ` +
-            `Endoso facturación: ${endosoFacturacion?.endoso ?? "SIN INFORMAR"} | ` +
-            `Tipo: ${endosoFacturacion?.tipo_endoso ?? "SIN INFORMAR"} | ` +
-            `Período: ${endosoFacturacion?.vigencia_desde ?? "SIN INFORMAR"} -> ` +
-            `${endosoFacturacion?.vigencia_hasta ?? "SIN INFORMAR"}`
-        );
+        const cobertura = coberturaResolveService.resolver(estado.endosos, planes);
+
+        /*
+        * Construimos la póliza normalizada utilizando exclusivamente
+        * información previamente resuelta por los servicios de dominio.
+        *
+        * La cobertura comercial proviene de FedPatCoberturaResolver.
+        *
+        * Los importes anualizados y los riesgos provienen del mismo
+        * análisis realizado por FedPatRiskEngine.
+        */
+        const poliza = polizaMapper.mapear({
+            certificado,
+            endoso: endosoFacturacion,
+            productor,
+            cliente,
+            cobertura,
+            primaAnual: analisis.primaAnual,
+            premioAnual: analisis.premioAnual,
+            riesgos: analisis.riesgos
+        });
 
 
-        if (
-            analisis.riesgos.includes(
-                TipoRiesgo.FLOTA
-            )
-        ) {
+        /*
+        * La póliza ya fue completamente normalizada y validada.
+        *
+        * Solamente llegan a este punto pólizas que contienen al menos
+        * un riesgo detectado por FedPatRiskEngine.
+        */
+        polizasConRiesgo.push(poliza);
 
+
+
+        if (analisis.riesgos.includes(TipoRiesgo.FLOTA)) {
             flota++;
         }
 
 
-        if (
-            analisis.riesgos.includes(
-                TipoRiesgo.PRIMA_ALTA
-            )
-        ) {
-
+        if (analisis.riesgos.includes(TipoRiesgo.PRIMA_ALTA)) {
             primaAlta++;
         }
 
 
-        if (
-            analisis.riesgos.includes(
-                TipoRiesgo.PREMIO_ALTO
-            )
-        ) {
-
+        if (analisis.riesgos.includes(TipoRiesgo.PREMIO_ALTO)) {
             premioAlto++;
         }
 
-
-        if (
-            analisis.riesgos.length > 1
-        ) {
-
+        if (analisis.riesgos.length > 1) {
             multiplesRiesgos++;
         }
+
+    
+    
     }
 
 
-    const duracion =
-        Date.now() - inicio;
+          /**
+     * Contadores globales de la reconciliación contra Firestore.
+     *
+     * Permiten conocer cuántos riesgos quedaron vigentes,
+     * cuántos fueron creados, actualizados o eliminados
+     * durante la sincronización de Federación Patronal.
+     */
+    let riesgosActualesFirestore = 0;
+    let riesgosNuevosFirestore = 0;
+    let riesgosActualizadosFirestore = 0;
+    let riesgosEliminadosFirestore = 0;
+
+    /**
+     * Muestra las pólizas riesgosas normalizadas antes de cualquier
+     * operación de persistencia.
+     *
+     * Este diagnóstico permite identificar el productor asociado a cada
+     * póliza y seleccionar un caso controlado para la primera prueba
+     * de escritura en Firestore.
+     */
+    console.log("");
+    console.log("==================================================");
+    console.log("PÓLIZAS CON RIESGO POR PRODUCTOR");
+    console.log("==================================================");
+
+    for (const poliza of polizasConRiesgo) {
+
+        console.log({
+            id: poliza.id,
+            productorCodigo: poliza.productor.codigo,
+            productorNombre: poliza.productor.nombre,
+            numeroPoliza: poliza.detallePoliza.numeroPoliza,
+            riesgos: poliza.riesgos
+        });
+    }
+
+
+    /**
+     * La reconciliación se realiza por productor.
+     *
+     * Se recorren todos los productores informados por Federación
+     * Patronal, incluso aquellos que actualmente no tengan riesgos.
+     *
+     * Esto es importante porque un productor puede haber tenido
+     * riesgos almacenados previamente que ya no existan en la
+     * reconstrucción actual.
+     */
+    if (ESCRIBIR_FIRESTORE && polizaRepository !== null) {
+
+        console.log("");
+        console.log("==================================================");
+        console.log("SINCRONIZANDO FIRESTORE");
+        console.log("==================================================");
+
+
+        for (const productor of productores) {
+
+            /**
+             * Seleccionamos únicamente las pólizas riesgosas
+             * correspondientes al productor actual.
+             */
+            const riesgosProductor = polizasConRiesgo.filter(
+                poliza =>
+                    poliza.productor.codigo === productor.codigo
+            );
+        
+            console.log(
+                `${productor.codigo} - ${productor.nombre}: ` +
+                `${riesgosProductor.length} riesgos`
+            );
+        
+            /**
+             * Reconciliamos el estado actual de riesgos del productor
+             * contra la colección de pólizas.
+             *
+             * Al tratarse de una sincronización completa, el repositorio
+             * puede crear, actualizar o eliminar riesgos previamente
+             * almacenados para este productor y compañía.
+             */
+            const resultadoFirestore = await polizaRepository.sincronizarRiesgosProductor(
+                    productor,
+                    ECompania.FEDERACION_PATRONAL,
+                    riesgosProductor
+                );
+        
+            riesgosActualesFirestore +=
+                resultadoFirestore.riesgosActuales;
+        
+            riesgosNuevosFirestore +=
+                resultadoFirestore.riesgosNuevos;
+        
+            riesgosActualizadosFirestore +=
+                resultadoFirestore.riesgosActualizados;
+        
+            riesgosEliminadosFirestore +=
+                resultadoFirestore.riesgosEliminados;
+        } 
+    }
+      
+
+    const duracion = Date.now() - inicio;
 
 
     console.log("");
 
-    console.log(
-        "=================================================="
-    );
+    console.log("==================================================");
+    console.log("RESULTADO");
+    console.log("==================================================");
 
-    console.log(
-        "RESULTADO"
-    );
-
-    console.log(
-        "=================================================="
-    );
-
-
-    console.log(
-        `Pólizas procesadas:       ${DateUtils.formatearNumero(estados.size)}`
-    );
-
-    console.log(
-        `Sin riesgo:               ${DateUtils.formatearNumero(sinRiesgo)}`
-    );
-
-    console.log(
-        `Con algún riesgo:         ${DateUtils.formatearNumero(conRiesgo)}`
-    );
-
+    console.log(`Pólizas procesadas:       ${DateUtils.formatearNumero(estados.size)}`);
+    console.log(`Sin riesgo:               ${DateUtils.formatearNumero(sinRiesgo)}`);
+    console.log(`Con algún riesgo:         ${DateUtils.formatearNumero(conRiesgo)}`);
 
     console.log("");
 
-
-    console.log(
-        `FLOTA:                    ${DateUtils.formatearNumero(flota)}`
-    );
-
-    console.log(
-        `PRIMA_ALTA:               ${DateUtils.formatearNumero(primaAlta)}`
-    );
-
-    console.log(
-        `PREMIO_ALTO:              ${DateUtils.formatearNumero(premioAlto)}`
-    );
-
-    console.log(
-        `Más de un riesgo:         ${DateUtils.formatearNumero(multiplesRiesgos)}`
-    );
-
+    console.log(`FLOTA:                    ${DateUtils.formatearNumero(flota)}`);
+    console.log(`PRIMA_ALTA:               ${DateUtils.formatearNumero(primaAlta)}`);
+    console.log(`PREMIO_ALTO:              ${DateUtils.formatearNumero(premioAlto)}`);
+    console.log(`Más de un riesgo:         ${DateUtils.formatearNumero(multiplesRiesgos)}`);
 
     console.log("");
 
@@ -855,25 +812,27 @@ async function main(): Promise<void> {
         "--------------------------------------------------"
     );
 
-    console.log(
-        `PÓLIZAS QUE GUARDARÍAMOS: ${DateUtils.formatearNumero(conRiesgo)}`
-    );
-
-    console.log(
-        "--------------------------------------------------"
-    );
-
-
+    console.log(`PÓLIZAS NORMALIZADAS:     ${DateUtils.formatearNumero(polizasConRiesgo.length)}`);
+    console.log("--------------------------------------------------");
     console.log("");
 
-    console.log(
-        `Duración total: ${DateUtils.formatearDuracion(duracion)}`
-    );
+    console.log(`Duración total: ${DateUtils.formatearDuracion(duracion)}`);
 
-    console.log(
-        "No se realizaron escrituras en Firestore."
-    );
+    if (ESCRIBIR_FIRESTORE) {
 
+        console.log("");
+        console.log("RESULTADO FIRESTORE");
+
+        console.log({
+            riesgosActuales: riesgosActualesFirestore,
+            riesgosNuevos: riesgosNuevosFirestore,
+            riesgosActualizados: riesgosActualizadosFirestore,
+            riesgosEliminados: riesgosEliminadosFirestore
+        });
+
+    } else {
+        console.log("Modo diagnóstico: no se realizaron escrituras en Firestore.");
+    }
 }
 
 
@@ -887,10 +846,7 @@ async function main(): Promise<void> {
 main().catch(
     (error: unknown) => {
 
-        console.error(
-            "Error ejecutando sincronización FedPat:",
-            error
-        );
+        console.error("Error ejecutando sincronización FedPat:", error);
 
         process.exit(1);
     }

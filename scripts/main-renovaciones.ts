@@ -59,7 +59,7 @@ const EMAIL_PRUEBA =
  * false:
  * cada correo se envía al email real de la ejecutiva.
  */
-const MODO_PRUEBA = false;
+const MODO_PRUEBA = true;
 
 
 /*

@@ -176,6 +176,19 @@ export class FirestorePolizaRepository {
                     datos["vigencia"]?.hasta
                 )
             },
+
+            /*
+            * La próxima fecha de refacturación es opcional.
+            *
+            * Cuando existe en Firestore se convierte de Timestamp a Date.
+            * Si el documento no contiene el campo, se conserva undefined.
+            *
+            * El significado de su ausencia se determina mediante
+            * estadoRefacturacion.
+            */
+            fechaProximaRefacturacion: this.convertirFecha(
+                datos["fechaProximaRefacturacion"]
+            ),
     
             fechaCreacion: this.convertirFecha(
                 datos["fechaCreacion"]

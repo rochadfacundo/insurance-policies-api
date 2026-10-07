@@ -159,15 +159,6 @@ async function main(): Promise<void> {
     const riskEngine = new FedPatRiskEngine();
 
     /*
-    * Servicio encargado de resolver el movimiento representativo
-    * del período de facturación de cada póliza.
-    *
-    * Se mantiene separado del RiskEngine porque la selección del
-    * período de facturación no constituye una regla de riesgo.
-    */
-    const facturacionService = new FedPatFacturacionService();
-
-    /*
     * Mapper encargado de transformar el contexto ya resuelto
     * de Federación Patronal al modelo normalizado Poliza.
     *
@@ -442,23 +433,55 @@ async function main(): Promise<void> {
 
         /**
          * Antes de analizar riesgos resolvemos el certificado principal
-         * y descartamos pólizas cuya vigencia contractual ya finalizó.
+         * y validamos que la póliza pueda formar parte del conjunto actual.
          *
-         * Los estados históricos permanecen disponibles en memoria para
-         * reconstruir la cartera, pero no deben participar del conjunto
-         * de riesgos actuales.
+         * Se excluyen:
+         *
+         * - pólizas cuya vigencia contractual ya finalizó;
+         * - certificados cuyo estado actual informado por Federación sea 11.
+         *
+         * El estado 11 se trata como no elegible para análisis de riesgos.
+         * Esta decisión se basa en el diagnóstico histórico de cartera:
+         * la gran mayoría de los certificados con este estado presentan
+         * movimientos de tipo A asociados a bajas, rescisiones u otras
+         * situaciones que interrumpen la operatoria normal de la póliza.
+         *
+         * No se asigna aquí una descripción contractual específica al código
+         * 11, ya que Federación no proporcionó un catálogo oficial de estados.
+         *
+         * Los estados históricos continúan almacenados en memoria porque son
+         * necesarios para reconstruir correctamente la cartera, aunque no
+         * participen del conjunto final de riesgos.
          */
         const certificado = contextService.obtenerCertificadoPrincipal(estado);
 
         if (certificado === null) {
 
-            console.warn(`⚠ ${estado.codigoRamo}/${estado.numeroPoliza} ` +"sin certificado principal");
+        console.warn(
+            `⚠ ${estado.codigoRamo}/${estado.numeroPoliza} ` +
+            "sin certificado principal"
+        );
 
-            continue;
+        continue;
         }
 
+        /**
+        * El estado 11 se excluye antes de ejecutar el RiskEngine.
+        *
+        * De esta manera evitamos detectar riesgos sobre certificados que
+        * Federación ya informa en un estado operacional no elegible, incluso
+        * cuando su vigencia_hasta contractual todavía se encuentra en el futuro.
+        */
+        if (certificado.estado_certificado === 11) {
+        continue;
+        }
+
+        /**
+        * La vigencia contractual sigue siendo una validación independiente
+        * del estado informado por Federación.
+        */
         if (DateUtils.estaVencida(certificado.vigencia_hasta)) {
-            continue;
+        continue;
         }
 
 
@@ -477,15 +500,6 @@ async function main(): Promise<void> {
 
 
         conRiesgo++;
-
-        /*
-        * Resolvemos independientemente el movimiento que representa
-        * el período de facturación de la póliza.
-        *
-        * Este movimiento no depende del utilizado por ImportesService
-        * para calcular prima o premio anualizados.
-        */
-        const endosoFacturacion = facturacionService.obtenerEndosoFacturacion(estado);
 
 
         /*
@@ -551,13 +565,15 @@ async function main(): Promise<void> {
         */
         const poliza = polizaMapper.mapear({
             certificado,
-            endoso: endosoFacturacion,
+            endoso: analisis.endosoFacturacion,
             productor,
             cliente,
             cobertura,
             primaAnual: analisis.primaAnual,
             premioAnual: analisis.premioAnual,
-            riesgos: analisis.riesgos
+            riesgos: analisis.riesgos,
+            fechaProximaRefacturacion: analisis.fechaProximaRefacturacion,
+            estadoRefacturacion: analisis.estadoRefacturacion
         });
 
 
@@ -569,26 +585,16 @@ async function main(): Promise<void> {
         */
         polizasConRiesgo.push(poliza);
 
+        if (analisis.riesgos.includes(TipoRiesgo.FLOTA)) 
+        flota++;
 
+        if (analisis.riesgos.includes(TipoRiesgo.PRIMA_ALTA)) 
+        primaAlta++;
 
-        if (analisis.riesgos.includes(TipoRiesgo.FLOTA)) {
-            flota++;
-        }
-
-
-        if (analisis.riesgos.includes(TipoRiesgo.PRIMA_ALTA)) {
-            primaAlta++;
-        }
-
-
-        if (analisis.riesgos.includes(TipoRiesgo.PREMIO_ALTO)) {
-            premioAlto++;
-        }
-
-        if (analisis.riesgos.length > 1) {
-            multiplesRiesgos++;
-        }
-
+        if (analisis.riesgos.includes(TipoRiesgo.PREMIO_ALTO)) 
+        premioAlto++;
+        if (analisis.riesgos.length > 1) 
+        multiplesRiesgos++;
     
     
     }

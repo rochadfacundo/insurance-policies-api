@@ -24,6 +24,8 @@ import {
 import { FedPatImportesService }
     from "./fedPatImportesService";
 import { FedPatCertificadoEndoso } from "../models/fedPatCertificadoEndoso";
+import { FedPatFacturacionService } from "./fedPatFacturacionService";
+import { EstadoRefacturacion } from "../../../models/estadoRefacturacion";
 
 
 /**
@@ -74,6 +76,24 @@ export interface FedPatRiskAnalysis {
      * período de facturación que originó el análisis económico.
      */
     endosoFacturacion: FedPatCertificadoEndoso | null;
+
+    /**
+     * Próxima fecha de refacturación conocida dentro de la vigencia
+     * contractual actual.
+     *
+     * null indica que no existe otra refacturación identificable con
+     * las reglas actualmente soportadas.
+     */
+    fechaProximaRefacturacion: string | null;
+
+    /**
+     * Resultado del análisis de próxima refacturación.
+     *
+     * Permite distinguir entre una fecha pendiente conocida,
+     * ausencia de una nueva refacturación dentro de la vigencia
+     * y una modalidad todavía no determinada.
+     */
+    estadoRefacturacion: EstadoRefacturacion;
 }
 
 
@@ -122,18 +142,18 @@ export class FedPatRiskEngine {
     private readonly PREMIO_ALTO_MINIMO = 7_000_000;
 
 
-    private readonly consolidationService =
-        new FedPatPolizaConsolidationService();
-
-    private readonly productoDatosMapper =
-        new FedPatProductoDatosMapper();
-
-    private readonly vehiculoMapper =
-        new FedPatVehiculoMapper();
-
-    private readonly importesService =
-        new FedPatImportesService();
-
+    private readonly consolidationService = new FedPatPolizaConsolidationService();
+    private readonly productoDatosMapper = new FedPatProductoDatosMapper();
+    private readonly vehiculoMapper = new FedPatVehiculoMapper();
+    private readonly importesService = new FedPatImportesService();
+    /**
+     * Resuelve el movimiento representativo de facturación de la póliza.
+     *
+     * Esta responsabilidad se mantiene separada del cálculo económico:
+     * prima y premio pueden provenir de una fuente consolidada, mientras
+     * que el período de facturación se determina a partir de los endosos.
+     */
+    private readonly facturacionService = new FedPatFacturacionService();
 
     /**
      * Analiza el estado acumulado conocido de una póliza.
@@ -161,6 +181,22 @@ export class FedPatRiskEngine {
          * confiable.
          */
         const importes = this.importesService.calcularImportesAnuales(estado);
+
+        /*
+        * El movimiento representativo de facturación se resuelve de forma
+        * independiente de la fuente económica.
+        *
+        * Esto permite, por ejemplo, que una póliza T/2 obtenga prima y premio
+        * desde certificados-sumas sin perder el endoso necesario para
+        * representar su período de facturación.
+        */
+        const endosoFacturacion = this.facturacionService.obtenerEndosoFacturacion(estado);
+
+        /*
+        * La resolución devuelve conjuntamente la fecha y su estado
+        * para evitar que null tenga significados ambiguos.
+        */
+        const proximaRefacturacion = this.facturacionService.obtenerFechaProximaRefacturacion(estado);
 
 
         /*
@@ -201,18 +237,17 @@ export class FedPatRiskEngine {
         if (!this.esRamoVehicular(estado.codigoRamo)) {
 
             /*
-            * Conservamos también el movimiento de facturación utilizado
-            * por FedPatImportesService.
-            *
-            * De esta manera el consumidor del análisis puede utilizar
-            * exactamente el mismo endoso que originó los importes anuales.
+            * El movimiento de facturación se conserva independientemente
+            * del mecanismo utilizado para calcular los importes económicos.
             */
             return {
                 riesgos,
                 vehiculos: [],
                 primaAnual: importes.primaAnual,
                 premioAnual: importes.premioAnual,
-                endosoFacturacion: importes.endosoFacturacion
+                endosoFacturacion,
+                fechaProximaRefacturacion: proximaRefacturacion.fecha,
+                estadoRefacturacion: proximaRefacturacion.estado
             };
         }
 
@@ -238,15 +273,20 @@ export class FedPatRiskEngine {
 
 
         /*
-        * El resultado expone tanto los riesgos detectados como los
-        * valores y el movimiento que justificaron el análisis económico.
+        * El resultado expone los riesgos detectados, los importes económicos
+        * normalizados y el movimiento representativo de facturación.
+        *
+        * El movimiento de facturación no necesariamente constituye la fuente
+        * de los importes económicos.
         */
         return {
             riesgos,
             vehiculos,
             primaAnual: importes.primaAnual,
             premioAnual: importes.premioAnual,
-            endosoFacturacion: importes.endosoFacturacion
+            endosoFacturacion,
+            fechaProximaRefacturacion: proximaRefacturacion.fecha,
+            estadoRefacturacion: proximaRefacturacion.estado
         };
     }
 

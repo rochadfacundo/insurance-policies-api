@@ -7,6 +7,7 @@ import { FedPatCliente } from "../models/fedPatCliente";
 import { FedPatCertificado } from "../models/fetPatCertificado";
 import { TipoRiesgo } from "../../../models/TipoRiesgo";
 import { DateUtils } from "../../../utils/dateUtils";
+import { EstadoRefacturacion } from "../../../models/estadoRefacturacion";
 
 
 /**
@@ -77,6 +78,24 @@ export interface FedPatPolizaMapperContext {
      * decidir la persistencia de la póliza.
      */
     riesgos: TipoRiesgo[];
+
+    /**
+     * Próxima fecha de refacturación previamente determinada por la
+     * capa de dominio.
+     *
+     * null representa que no existe otra refacturación conocida dentro
+     * de la vigencia contractual actual.
+     */
+    fechaProximaRefacturacion: string | null;
+
+    /**
+     * Estado resultante del análisis de próxima refacturación.
+     *
+     * Permite distinguir una fecha pendiente conocida, la ausencia
+     * de otra refacturación dentro de la vigencia contractual y los
+     * casos que todavía no pueden determinarse.
+     */
+    estadoRefacturacion: EstadoRefacturacion;
 }
 
 /**
@@ -114,7 +133,9 @@ export class FedPatPolizaMapper {
             cobertura,
             primaAnual,
             premioAnual,
-            riesgos
+            riesgos,
+            fechaProximaRefacturacion,
+            estadoRefacturacion
         } = context;
 
         /*
@@ -229,6 +250,18 @@ export class FedPatPolizaMapper {
                 hasta: facturacionHasta
             },
 
+            ...(fechaProximaRefacturacion !== null
+                ? { fechaProximaRefacturacion: new Date(fechaProximaRefacturacion)}
+                : {}
+            ),
+            /*
+            * El estado se persiste siempre para Federación Patronal.
+            *
+            * Esto permite distinguir entre una póliza sin otra
+            * refacturación pendiente y una cuya fecha todavía
+            * no puede determinarse con las reglas disponibles.
+            */
+            estadoRefacturacion,
             /*
              * La vigencia corresponde al período contractual informado
              * por el certificado principal.

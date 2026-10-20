@@ -1,4 +1,5 @@
 import { EstadoRefacturacion } from "../../../models/estadoRefacturacion";
+import { TipoProximaGestion } from "../../../models/tipoProximaGestion";
 import { FedPatCertificadoEndoso } from "../models/fedPatCertificadoEndoso";
 import { FedPatPolizaState } from "../models/fedPatPolizaState";
 
@@ -33,6 +34,17 @@ export interface FedPatProximaRefacturacion {
     estado: EstadoRefacturacion;
 }
 
+/**
+ * Próximo evento de gestión de una póliza.
+ *
+ * La fecha se devuelve en formato YYYY-MM-DD,
+ * o null cuando no puede determinarse.
+ */
+export interface FedPatProximaGestion {
+    fecha: string | null;
+    tipo: TipoProximaGestion | null;
+}
+
 export class FedPatFacturacionService {
 
     /**
@@ -49,34 +61,21 @@ export class FedPatFacturacionService {
      *
      * Si no existe ningún movimiento compatible, se devuelve null.
      */
-    obtenerEndosoFacturacion(
-        estado: FedPatPolizaState
-    ): FedPatCertificadoEndoso | null {
+    obtenerEndosoFacturacion(estado: FedPatPolizaState): FedPatCertificadoEndoso | null {
 
-        const ultimoF =
-            this.obtenerUltimoMovimiento(
-                estado.endosos,
-                "F"
-            );
+        const ultimoF = this.obtenerUltimoMovimiento(estado.endosos,"F");
 
         if (ultimoF !== null) {
             return ultimoF;
         }
 
-        const ultimoR =
-            this.obtenerUltimoMovimiento(
-                estado.endosos,
-                "R"
-            );
+        const ultimoR = this.obtenerUltimoMovimiento(estado.endosos,"R");
 
         if (ultimoR !== null) {
             return ultimoR;
         }
 
-        return this.obtenerUltimoMovimiento(
-            estado.endosos,
-            "E"
-        );
+        return this.obtenerUltimoMovimiento(estado.endosos,"E");
     }
 
     /**
@@ -88,30 +87,19 @@ export class FedPatFacturacionService {
      *
      * No se modifica el array original almacenado en el estado.
      */
-    private obtenerUltimoMovimiento(
-        endosos: FedPatCertificadoEndoso[],
-        tipo: string
-    ): FedPatCertificadoEndoso | null {
+    private obtenerUltimoMovimiento(endosos: FedPatCertificadoEndoso[],tipo: string): FedPatCertificadoEndoso | null {
 
-        const movimientos =
-            endosos.filter(
-                endoso =>
-                    endoso.certificado === 0 &&
-                    this.normalizarTipo(
-                        endoso.tipo_endoso
-                    ) === tipo
-            );
+        const movimientos = endosos.filter( endoso =>
+                    endoso.certificado === 0 && this.normalizarTipo(endoso.tipo_endoso) === tipo);
 
         if (movimientos.length === 0) {
             return null;
         }
 
-        return movimientos.reduce(
-            (ultimo, actual) =>
+        return movimientos.reduce((ultimo, actual) =>
                 actual.endoso > ultimo.endoso
                     ? actual
-                    : ultimo
-        );
+                    : ultimo);
     }
 
     /**
@@ -122,24 +110,26 @@ export class FedPatFacturacionService {
      * La validación en runtime evita que esos datos interrumpan
      * el procesamiento histórico.
      */
-    private normalizarTipo(
-        tipo: string | null | undefined
-    ): string {
+    private normalizarTipo(tipo: string | null | undefined): string {
 
         if (typeof tipo !== "string") {
             return "";
         }
 
-        return tipo
-            .trim()
-            .toUpperCase();
+        return tipo.trim().toUpperCase();
     }
 
    /**
      * Obtiene el estado y la próxima fecha de refacturación conocida
      * dentro de la vigencia contractual de una póliza.
      *
-     * Actualmente la regla está validada únicamente para pólizas T/2.
+     * Modalidades con reglas validadas:
+     *
+     * - T/2: refacturación semestral de flotas.
+     * - D/12: refacturación mensual individual.
+     *
+     * Para D/12 se utiliza la fecha de finalización del último
+     * período de refacturación emitido (movimiento F).
      *
      * Para T/2:
      *
@@ -189,33 +179,80 @@ export class FedPatFacturacionService {
             };
         }
 
-        const tipoFacturacion =
-            certificadoPrincipal.tipo_facturacion
+        const tipoFacturacion = certificadoPrincipal.tipo_facturacion
                 ?.trim()
                 .toUpperCase() ?? "";
 
-        const cantidadFacturacion =
-            certificadoPrincipal.cant_facturacion;
+        const cantidadFacturacion = certificadoPrincipal.cant_facturacion;
 
         /*
-        * La regla implementada está validada exclusivamente para T/2.
-        * Cualquier otra modalidad queda explícitamente como no determinada.
+        * REFACTURACIÓN MENSUAL D/12
+        *
+        * En las pólizas individuales con 12 períodos de facturación,
+        * cada movimiento F representa una refacturación emitida.
+        *
+        * La fecha de emisión puede ser anterior al inicio del período.
+        * Por eso, la próxima fecha de gestión se obtiene de
+        * vigencia_hasta del último movimiento F del certificado principal.
+        *
+        * Caso validado:
+        * Póliza 35331993
+        * F/1 - Endoso 6
+        * Emisión:       21/09/2026
+        * Vigencia:      02/10/2026 al 02/11/2026
+        * Próxima fecha: 02/11/2026
         */
-        if (
-            tipoFacturacion !== "T" ||
-            cantidadFacturacion !== 2
-        ) {
+        if (tipoFacturacion === "D" && cantidadFacturacion === 12) {
+
+            const ultimoF = this.obtenerUltimoMovimiento(estado.endosos, "F");
+
+            /*
+            * No inferimos una fecha si no existe una refacturación
+            * emitida o si el movimiento carece de vigencia_hasta.
+            */
+            if (ultimoF === null || !ultimoF.vigencia_hasta) {
+                return {
+                    fecha: null,
+                    estado: EstadoRefacturacion.NO_DETERMINADA
+                };
+            }
+
+            /*
+            * Evitamos utilizar un período anterior si posteriormente
+            * se registró una anulación en el certificado principal.
+            *
+            * Por seguridad, cualquier movimiento A posterior
+            * requiere revisar el estado antes de inferir una fecha.
+            */
+            const existeAnulacionPosterior = estado.endosos.some(endoso =>
+                    endoso.certificado === 0 && this.normalizarTipo(endoso.tipo_endoso) === "A" 
+                    && endoso.endoso > ultimoF.endoso);
+
+            if (existeAnulacionPosterior) {
+                return {
+                    fecha: null,
+                    estado: EstadoRefacturacion.NO_DETERMINADA
+                };
+            }
+
+            return {
+                fecha: ultimoF.vigencia_hasta,
+                estado: EstadoRefacturacion.PENDIENTE
+            };
+        }
+
+        /*
+        * Las modalidades distintas de T/2 y D/12 permanecen
+        * sin una regla de cálculo validada.
+        */
+        if (tipoFacturacion !== "T" || cantidadFacturacion !== 2) {
             return {
                 fecha: null,
                 estado: EstadoRefacturacion.NO_DETERMINADA
             };
         }
 
-        const endososCertificadoPrincipal =
-            estado.endosos.filter(
-                endoso =>
-                    endoso.certificado === 0
-            );
+        const endososCertificadoPrincipal = estado.endosos.filter(endoso => endoso.certificado === 0);
 
         /*
         * En los casos T/2 analizados, la existencia de F indica que
@@ -224,26 +261,17 @@ export class FedPatFacturacionService {
         * Por lo tanto, no queda una nueva refacturación pendiente
         * dentro de la vigencia contractual actual.
         */
-        const existeSegundoPeriodo =
-            endososCertificadoPrincipal.some(
-                endoso =>
-                    this.normalizarTipo(
-                        endoso.tipo_endoso
-                    ) === "F"
-            );
+        const existeSegundoPeriodo = endososCertificadoPrincipal.some(endoso => 
+            this.normalizarTipo(endoso.tipo_endoso) === "F");
 
         if (existeSegundoPeriodo) {
             return {
                 fecha: null,
-                estado:
-                    EstadoRefacturacion.SIN_REFAC_PENDIENTE
+                estado: EstadoRefacturacion.SIN_REFAC_PENDIENTE
             };
         }
 
-        const endosoFacturacion =
-            this.obtenerEndosoFacturacion(
-                estado
-            );
+        const endosoFacturacion = this.obtenerEndosoFacturacion(estado);
 
         /*
         * Si estamos ante una T/2 pero no conseguimos identificar
@@ -270,8 +298,7 @@ export class FedPatFacturacionService {
         const existeNoPagoPosterior = endososCertificadoPrincipal.some(endoso =>
                 this.normalizarTipo(endoso.tipo_endoso) === "A" &&
                 endoso.codigo_motivo_endoso === 219 &&
-                endoso.endoso > endosoFacturacion.endoso
-        );
+                endoso.endoso > endosoFacturacion.endoso);
 
         if (existeNoPagoPosterior) {
         return {
@@ -290,6 +317,55 @@ export class FedPatFacturacionService {
             fecha: endosoFacturacion.vigencia_hasta,
             estado: EstadoRefacturacion.PENDIENTE
         };
+    }
+
+
+    /**
+     * Determina la próxima gestión comercial conocida.
+     *
+     * Prioriza una refacturación pendiente y, cuando la
+     * modalidad T/2 ya completó sus dos períodos,
+     * utiliza el vencimiento contractual como renovación.
+     *
+     * Las modalidades no validadas no generan fechas inferidas.
+     */
+    obtenerProximaGestion(estado: FedPatPolizaState): FedPatProximaGestion {
+
+        const certificadoPrincipal = estado.certificados.find(
+            certificado => certificado.certificado === 0
+        ) ?? null;
+
+        if (certificadoPrincipal === null) {
+            return { fecha: null, tipo: null };
+        }
+
+        const refacturacion = this.obtenerFechaProximaRefacturacion(estado);
+
+        if (refacturacion.estado === EstadoRefacturacion.PENDIENTE && refacturacion.fecha !== null) {
+            return {
+                fecha: refacturacion.fecha,
+                tipo: TipoProximaGestion.REFACTURACION
+            };
+        }
+
+        const tipoFacturacion = certificadoPrincipal.tipo_facturacion?.trim().toUpperCase() ?? "";
+
+        const cantidadFacturacion = certificadoPrincipal.cant_facturacion;
+
+        /*
+        * T/2: si el segundo período ya fue facturado,
+        * la próxima gestión es la renovación anual.
+        */
+        if (tipoFacturacion === "T" && cantidadFacturacion === 2 &&
+            refacturacion.estado === EstadoRefacturacion.SIN_REFAC_PENDIENTE &&
+            certificadoPrincipal.vigencia_hasta) {
+            return {
+                fecha: certificadoPrincipal.vigencia_hasta,
+                tipo: TipoProximaGestion.RENOVACION
+            };
+        }
+
+        return { fecha: null, tipo: null };
     }
 
 }

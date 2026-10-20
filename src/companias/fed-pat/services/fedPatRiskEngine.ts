@@ -26,6 +26,7 @@ import { FedPatImportesService }
 import { FedPatCertificadoEndoso } from "../models/fedPatCertificadoEndoso";
 import { FedPatFacturacionService } from "./fedPatFacturacionService";
 import { EstadoRefacturacion } from "../../../models/estadoRefacturacion";
+import { TipoProximaGestion } from "../../../models/tipoProximaGestion";
 
 
 /**
@@ -94,6 +95,21 @@ export interface FedPatRiskAnalysis {
      * y una modalidad todavía no determinada.
      */
     estadoRefacturacion: EstadoRefacturacion;
+
+    /**
+     * Fecha del próximo evento de gestión comercial.
+     *
+     * null indica que no pudo determinarse.
+     * La conversión a Date corresponde al mapper.
+     */
+    fechaProximaGestion: string | null;
+
+    /**
+     * Identifica si la próxima gestión corresponde
+     * a una refacturación o renovación.
+     */
+    tipoProximaGestion: TipoProximaGestion | null;
+
 }
 
 
@@ -198,6 +214,11 @@ export class FedPatRiskEngine {
         */
         const proximaRefacturacion = this.facturacionService.obtenerFechaProximaRefacturacion(estado);
 
+        /*
+        * Determina la próxima gestión comercial conocida.
+        * Puede ser una refacturación o una renovación.
+        */
+        const proximaGestion = this.facturacionService.obtenerProximaGestion(estado);
 
         /*
          * PRIMA_ALTA se determina exclusivamente sobre la
@@ -247,17 +268,14 @@ export class FedPatRiskEngine {
                 premioAnual: importes.premioAnual,
                 endosoFacturacion,
                 fechaProximaRefacturacion: proximaRefacturacion.fecha,
-                estadoRefacturacion: proximaRefacturacion.estado
+                estadoRefacturacion: proximaRefacturacion.estado,
+                fechaProximaGestion: proximaGestion.fecha,
+                tipoProximaGestion: proximaGestion.tipo
             };
         }
 
 
-        const vehiculos =
-            this.obtenerVehiculos(
-                estado,
-                datos,
-                tablas
-            );
+        const vehiculos = this.obtenerVehiculos(estado, datos, tablas);
 
 
         /*
@@ -266,9 +284,7 @@ export class FedPatRiskEngine {
          */
         if (vehiculos.length > 1) {
 
-            riesgos.push(
-                TipoRiesgo.FLOTA
-            );
+            riesgos.push(TipoRiesgo.FLOTA);
         }
 
 
@@ -286,7 +302,9 @@ export class FedPatRiskEngine {
             premioAnual: importes.premioAnual,
             endosoFacturacion,
             fechaProximaRefacturacion: proximaRefacturacion.fecha,
-            estadoRefacturacion: proximaRefacturacion.estado
+            estadoRefacturacion: proximaRefacturacion.estado,
+            fechaProximaGestion: proximaGestion.fecha,
+            tipoProximaGestion: proximaGestion.tipo
         };
     }
 

@@ -8,6 +8,7 @@ import { FedPatCertificado } from "../models/fetPatCertificado";
 import { TipoRiesgo } from "../../../models/TipoRiesgo";
 import { DateUtils } from "../../../utils/dateUtils";
 import { EstadoRefacturacion } from "../../../models/estadoRefacturacion";
+import { TipoProximaGestion } from "../../../models/tipoProximaGestion";
 
 
 /**
@@ -96,6 +97,18 @@ export interface FedPatPolizaMapperContext {
      * casos que todavía no pueden determinarse.
      */
     estadoRefacturacion: EstadoRefacturacion;
+
+
+    /**
+     * Fecha de la próxima gestión comercial determinada
+     * por FedPatFacturacionService.
+     */
+    fechaProximaGestion: string | null;
+
+    /**
+     * Tipo de próxima gestión: refacturación o renovación.
+     */
+    tipoProximaGestion: TipoProximaGestion | null;
 }
 
 /**
@@ -135,7 +148,9 @@ export class FedPatPolizaMapper {
             premioAnual,
             riesgos,
             fechaProximaRefacturacion,
-            estadoRefacturacion
+            estadoRefacturacion,    
+            fechaProximaGestion,
+            tipoProximaGestion
         } = context;
 
         /*
@@ -262,6 +277,20 @@ export class FedPatPolizaMapper {
             * no puede determinarse con las reglas disponibles.
             */
             estadoRefacturacion,
+
+            /*
+            * La próxima gestión puede ser una refacturación
+            * o una renovación de la vigencia contractual.
+            *
+            * Solo persistimos fecha y tipo cuando ambos
+            * fueron determinados por la capa de dominio.
+            */
+            ...(fechaProximaGestion !== null && tipoProximaGestion !== null
+                ? {
+                    fechaProximaGestion: new Date(fechaProximaGestion),
+                    tipoProximaGestion
+                } : {}
+            ),
             /*
              * La vigencia corresponde al período contractual informado
              * por el certificado principal.
@@ -277,6 +306,8 @@ export class FedPatPolizaMapper {
                 diasParaVencer: DateUtils.calcularDiasParaVencer(vigenciaHasta),
                 tipo: DateUtils.calcularTipoVigencia(vigenciaDesde, vigenciaHasta)
             }
+
+            
         };
     }
 

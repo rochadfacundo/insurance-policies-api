@@ -177,19 +177,21 @@ export class FirestorePolizaRepository {
                 )
             },
 
-            /*
-            * La próxima fecha de refacturación es opcional.
-            *
-            * Cuando existe en Firestore se convierte de Timestamp a Date.
-            * Si el documento no contiene el campo, se conserva undefined.
-            *
-            * El significado de su ausencia se determina mediante
-            * estadoRefacturacion.
-            */
+            
             fechaProximaRefacturacion: this.convertirFecha(
                 datos["fechaProximaRefacturacion"]
             ),
-    
+
+            /*
+            * Convertimos la fecha de próxima gestión de Firestore
+            * a Date para poder compararla correctamente.
+            *
+            * Es especialmente importante para Federación Patronal.
+            */
+            fechaProximaGestion: this.convertirFecha(
+                datos["fechaProximaGestion"]
+            ),
+                
             fechaCreacion: this.convertirFecha(
                 datos["fechaCreacion"]
             ),
@@ -536,6 +538,75 @@ export class FirestorePolizaRepository {
 
         return resultado.docs.map(documento => this.mapearDocumento(documento.id, documento.data()));
     }
+
+
+
+    /**
+     * Obtiene las pólizas cuya próxima gestión se encuentra
+     * dentro del período indicado.
+     *
+     * Para Mercantil Andina y Río Uruguay, la próxima gestión
+     * corresponde al final del período de facturación.
+     *
+     * Para Federación Patronal, utilizamos la fecha de próxima
+     * gestión calculada y almacenada durante la sincronización.
+     *
+     * Se realizan dos consultas independientes y se eliminan
+     * los duplicados mediante el ID de cada póliza.
+     *
+     * @param fechaDesde Inicio del período.
+     * @param fechaHasta Fin del período.
+     * @returns Pólizas con próxima gestión dentro del período.
+     */
+    async obtenerProximasAGestionar(fechaDesde: Date, fechaHasta: Date): Promise<Poliza[]> {
+
+        const desde = Timestamp.fromDate(fechaDesde);
+        const hasta = Timestamp.fromDate(fechaHasta);
+
+        const coleccion = this.firestore.collection(this.COLLECTION_NAME);
+
+        /*
+        * Consultamos las fechas que utiliza el frontend
+        * para representar la próxima gestión.
+        */
+        const [facturaciones, gestionesFedPat] = await Promise.all([
+
+            coleccion
+                .where("facturacion.hasta", ">=", desde)
+                .where("facturacion.hasta", "<=", hasta)
+                .get(),
+
+            coleccion
+                .where("fechaProximaGestion", ">=", desde)
+                .where("fechaProximaGestion", "<=", hasta)
+                .get()
+        ]);
+
+        /*
+        * Unificamos los resultados sin repetir pólizas.
+        */
+        const documentos = new Map<
+            string,
+            FirebaseFirestore.QueryDocumentSnapshot
+        >();
+
+        for (const documento of facturaciones.docs) {
+            documentos.set(documento.id, documento);
+        }
+
+        for (const documento of gestionesFedPat.docs) {
+            documentos.set(documento.id, documento);
+        }
+
+        /*
+        * Convertimos los documentos al modelo Poliza.
+        */
+        return [...documentos.values()].map(documento =>
+            this.mapearDocumento(documento.id, documento.data())
+        );
+    }
+
+
 
 
 }

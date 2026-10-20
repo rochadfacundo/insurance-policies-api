@@ -1,13 +1,14 @@
 import ExcelJS from "exceljs";
-
 import { Poliza } from "../models/poliza";
-
+import { RenovacionesService } from "./renovacionesService";
+import { ECompania } from "../models/eCompania";
 
 export class ExcelRenovacionesService {
 
-    private nombreHoja = "Renovaciones";
-    private creador = "Técnica y Servicios";
+    private readonly nombreHoja = "Renovaciones";
+    private readonly creador = "Técnica y Servicios";
 
+    private readonly renovacionesService = new RenovacionesService();
 
     async generarExcel(polizas: Poliza[]): Promise<Buffer> {
 
@@ -15,9 +16,9 @@ export class ExcelRenovacionesService {
 
         workbook.creator = this.creador;
         workbook.created = new Date();
+        workbook.properties.date1904 = false;
 
         const worksheet = workbook.addWorksheet(this.nombreHoja);
-
 
         worksheet.columns = [
             {
@@ -46,12 +47,16 @@ export class ExcelRenovacionesService {
                 width: 35
             },
             {
-                header: "Vencimiento",
-                key: "vencimiento",
-                width: 16
+                header: "Próxima gestión",
+                key: "fechaGestion",
+                width: 20
+            },
+            {
+                header: "Tipo de gestión",
+                key: "tipoGestion",
+                width: 24
             }
         ];
-
 
         for (const poliza of polizas) {
 
@@ -61,37 +66,72 @@ export class ExcelRenovacionesService {
                 productor: poliza.productor.nombre,
                 poliza: poliza.detallePoliza.numeroPoliza,
                 asegurado: poliza.cliente?.nombre ?? "-",
-                vencimiento: this.obtenerFechaVencimiento(poliza)
+                fechaGestion: this.obtenerFechaGestion(poliza),
+                tipoGestion: this.obtenerTipoGestion(poliza)
             });
         }
 
-
         this.aplicarFormato(worksheet);
 
-
         const buffer = await workbook.xlsx.writeBuffer();
-
 
         return Buffer.from(buffer);
     }
 
+        
+    /**
+     * Obtiene la fecha de próxima gestión y normaliza
+     * sus componentes de calendario utilizando UTC.
+     *
+     * De esta manera, Excel muestra el mismo día
+     * que Angular.
+     */
+    private obtenerFechaGestion(poliza: Poliza): Date | string {
 
-    private obtenerFechaVencimiento(poliza: Poliza): Date | string {
-
-        const fecha = poliza.vigencia?.hasta;
+        const fecha = this.renovacionesService.obtenerFechaProximaGestion(poliza);
 
         if (!fecha) {
             return "-";
         }
 
-        if (fecha instanceof Date) {
-            return fecha;
-        }
-
-        return String(fecha);
+        return new Date(Date.UTC(
+            fecha.getUTCFullYear(),
+            fecha.getUTCMonth(),
+            fecha.getUTCDate()
+        ));
     }
 
 
+    /**
+     * Determina el tipo de gestión.
+     *
+     * Federación Patronal dispone de un tipo explícito.
+     * Para Mercantil y RUS se utiliza el período
+     * de facturación.
+     */
+    private obtenerTipoGestion(poliza: Poliza): string {
+
+        if (poliza.compania === ECompania.FEDERACION_PATRONAL) {
+
+            switch (poliza.tipoProximaGestion) {
+
+                case "RENOVACION":
+                    return "Renovación";
+
+                case "REFACTURACION":
+                    return "Refacturación";
+
+                default:
+                    return "No determinada";
+            }
+        }
+
+        return "Gestión de facturación";
+    }
+
+    /**
+     * Aplica formato a la planilla.
+     */
     private aplicarFormato(worksheet: ExcelJS.Worksheet): void {
 
         const header = worksheet.getRow(1);
@@ -108,7 +148,6 @@ export class ExcelRenovacionesService {
 
         header.height = 22;
 
-
         worksheet.views = [
             {
                 state: "frozen",
@@ -116,32 +155,25 @@ export class ExcelRenovacionesService {
             }
         ];
 
-
         worksheet.autoFilter = {
             from: "A1",
-            to: "F1"
+            to: "G1"
         };
 
+        worksheet.eachRow((row, rowNumber) => {
 
-        worksheet.eachRow(
-            (
-                row,
-                rowNumber
-            ) => {
+            row.alignment = {
+                vertical: "middle"
+            };
 
-                row.alignment = {
-                    vertical: "middle"
-                };
+            if (rowNumber > 1) {
 
-                if (rowNumber > 1) {
+                const celdaFecha = row.getCell("fechaGestion");
 
-                    const celdaVencimiento = row.getCell("vencimiento");
-
-                    if (celdaVencimiento.value instanceof Date) {
-                        celdaVencimiento.numFmt = "dd/mm/yyyy";
-                    }
+                if (celdaFecha.value instanceof Date) {
+                    celdaFecha.numFmt = "dd/mm/yyyy";
                 }
             }
-        );
+        });
     }
 }

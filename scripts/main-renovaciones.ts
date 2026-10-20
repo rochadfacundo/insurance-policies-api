@@ -29,17 +29,22 @@ dotenv.config({
 
 /*
  * ============================================================
- * CONFIGURACIÓN DE LA PRUEBA
+ * FECHA DE REFERENCIA
  * ============================================================
  *
- * Simulamos que el proceso se ejecuta el 20/09/2026.
+ * Utilizamos la fecha actual del sistema.
  *
- * Por lo tanto, RenovacionesService debe buscar todas las
- * pólizas cuyo vencimiento esté dentro de octubre de 2026.
+ * RenovacionesService buscará las pólizas cuyo vencimiento
+ * corresponda al mes calendario siguiente.
+ *
+ * Ejemplos:
+ * 20/10/2026 → vencimientos de noviembre de 2026.
+ * 20/11/2026 → vencimientos de diciembre de 2026.
+ * 20/12/2026 → vencimientos de enero de 2027.
  */
 
-const FECHA_REFERENCIA = new Date(2026, 8, 20);
-
+//const FECHA_REFERENCIA = new Date();
+const FECHA_REFERENCIA = new Date(2026, 9, 20);
 
 /*
  * IMPORTANTE:
@@ -59,7 +64,7 @@ const EMAIL_PRUEBA =
  * false:
  * cada correo se envía al email real de la ejecutiva.
  */
-const MODO_PRUEBA = true;
+const MODO_PRUEBA = false;
 
 
 /*
@@ -71,7 +76,7 @@ const MODO_PRUEBA = true;
  * Cuando quieras realizar la prueba real con Mica,
  * dejarlo en true.
  */
-const ENVIAR_EMAIL = true;
+const ENVIAR_EMAIL = false;
 
 
 /*
@@ -81,18 +86,23 @@ const ENVIAR_EMAIL = true;
  */
 
 /**
- * Convierte una fecha a formato DD/MM/YYYY.
+
+ * Formatea una fecha utilizando UTC.
+ *
+ * Mantiene el mismo criterio que Angular,
+ * evitando diferencias por zona horaria.
+ *
+ * @param fecha Fecha que se desea formatear.
+ * @returns Fecha en formato DD/MM/YYYY.
  */
 function formatearFecha(fecha: Date): string {
 
-    return fecha.toLocaleDateString(
-        "es-AR",
-        {
-            day: "2-digit",
-            month: "2-digit",
-            year: "numeric"
-        }
-    );
+    return fecha.toLocaleDateString("es-AR", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        timeZone: "UTC"
+    });
 }
 
 
@@ -132,40 +142,38 @@ function obtenerFechaVencimiento(poliza: Poliza): Date | null {
 }
 
 
+
 /**
- * Ordena las pólizas por fecha de vencimiento.
+ * Ordena las pólizas por su fecha de próxima gestión.
  *
- * Las que vencen primero aparecen primero.
+ * Utiliza la misma lógica que RenovacionesService:
+ * - Mercantil y RUS: fin del período de facturación.
+ * - Federación Patronal: fechaProximaGestion.
+ *
+ * Las pólizas con gestión más próxima aparecen primero.
+ *
+ * @param polizas Pólizas que se desean ordenar.
+ * @param renovacionesService Servicio que resuelve la fecha de gestión.
+ * @returns Nuevo arreglo de pólizas ordenadas.
  */
-function ordenarPorVencimiento(polizas: Poliza[]): Poliza[] {
+function ordenarPorProximaGestion(
+    polizas: Poliza[],
+    renovacionesService: RenovacionesService
+): Poliza[] {
 
-    return [...polizas].sort(
-        (a, b) => {
+    return [...polizas].sort((a, b) => {
 
-            const fechaA = obtenerFechaVencimiento(a);
+        const fechaA = renovacionesService.obtenerFechaProximaGestion(a);
+        const fechaB = renovacionesService.obtenerFechaProximaGestion(b);
 
-            const fechaB = obtenerFechaVencimiento(b);
+        if (!fechaA && !fechaB) return 0;
+        if (!fechaA) return 1;
+        if (!fechaB) return -1;
 
-
-            if (!fechaA && !fechaB) {
-                return 0;
-            }
-
-
-            if (!fechaA) {
-                return 1;
-            }
-
-
-            if (!fechaB) {
-                return -1;
-            }
-
-
-            return (fechaA.getTime() - fechaB.getTime());
-        }
-    );
+        return fechaA.getTime() - fechaB.getTime();
+    });
 }
+
 
 
 /*
@@ -178,12 +186,10 @@ async function main(): Promise<void> {
 
     console.log("");
     console.log("==================================================");
-    console.log("PRUEBA ENVÍO RENOVACIONES OCTUBRE 2026");
+    console.log("PRUEBA ENVÍO RENOVACIONES NOVIEMBRE 2026");
+    console.log("Fecha simulada:     20/10/2026");
+    console.log("Período:            01/11/2026 - 30/11/2026");
     console.log("==================================================");
-
-    console.log("");
-    console.log("Fecha simulada:     20/09/2026");
-    console.log("Período:            01/10/2026 - 31/10/2026");
     //console.log(`Email de prueba:    ${EMAIL_PRUEBA}`);
 
     console.log(
@@ -271,26 +277,24 @@ async function main(): Promise<void> {
 
     for (const grupo of renovaciones) {
 
-        const polizas = ordenarPorVencimiento(grupo.polizas);
+        const polizas = ordenarPorProximaGestion(grupo.polizas,renovacionesService);
 
 
         totalPolizas += polizas.length;
 
 
-        console.log("");
-        console.log("");
-        console.log("==================================================");
+        const destinatario = MODO_PRUEBA
+            ? EMAIL_PRUEBA
+            : grupo.ejecutiva.email;
 
         console.log(`EJECUTIVA:       ${grupo.ejecutiva.nombre} ${grupo.ejecutiva.apellido}`);
-        console.log(`EMAIL REAL:      ${grupo.ejecutiva.email}`);
+        console.log(`DESTINATARIO:    ${destinatario}`);
         console.log(`PÓLIZAS:         ${polizas.length}`);
-
-        console.log("==================================================");
 
 
         for (const poliza of polizas) {
 
-            const vencimiento = obtenerFechaVencimiento(poliza);
+            const fechaGestion = renovacionesService.obtenerFechaProximaGestion(poliza);
 
 
             console.log("");
@@ -300,11 +304,9 @@ async function main(): Promise<void> {
             console.log(`Compañía:    ${poliza.compania}`);
             console.log(`N° Póliza:   ${poliza.detallePoliza.numeroPoliza}`);
             console.log(`Asegurado:   ${poliza.cliente.nombre}`);
-            console.log(`Vencimiento: ${
-                    vencimiento
-                        ? formatearFecha(vencimiento)
-                        : "SIN FECHA"
-                }`);
+            console.log(`Próxima gestión: ${  fechaGestion
+                    ? formatearFecha(fechaGestion)
+                    : "SIN FECHA" }`);
 
             console.log("--------------------------------------------------");
         }
@@ -376,7 +378,7 @@ async function main(): Promise<void> {
         /*
          * Ordenamos también las pólizas del Excel.
          */
-        const polizas = ordenarPorVencimiento(grupo.polizas);
+        const polizas = ordenarPorProximaGestion(grupo.polizas, renovacionesService);
 
 
         const nombreEjecutiva = `${grupo.ejecutiva.nombre}`;

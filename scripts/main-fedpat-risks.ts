@@ -16,7 +16,6 @@ import {FedPatTablasService} from "../src/companias/fed-pat/services/fedPatTabla
 import {FedPatRiskEngine} from "../src/companias/fed-pat/services/fedPatRiskEngine";
 import {FedPatClientesService} from "../src/companias/fed-pat/services/fedPatClientesService";
 import {FedPatProductoresService} from "../src/companias/fed-pat/services/fedPatProductoresService";
-import { FedPatFacturacionService } from "../src/companias/fed-pat/services/fedPatFacturacionService";
 import {FedPatPolizaContextService} from "../src/companias/fed-pat/services/fetPatPolizaMapperContext";
 import { FedPatPlanesService } from "../src/companias/fed-pat/services/fedPatPlanesService";
 
@@ -53,6 +52,14 @@ dotenv.config({ path: path.resolve(process.cwd(),"../.env")});
  * contra la colección `polizas`.
  */
 const ESCRIBIR_FIRESTORE = true;
+
+/**
+ * Cantidad máxima de días consultados simultáneamente.
+ *
+ * Cada día realiza siete consultas a la API de Federación.
+ * Con cinco días, ejecutamos hasta 35 solicitudes en paralelo.
+ */
+const DIAS_PARALELOS = 5;
 
 /**
  * Rango histórico utilizado para reconstruir la cartera.
@@ -225,97 +232,107 @@ async function main(): Promise<void> {
     console.log("Reconstruyendo cartera histórica...");
 
 
-    /*
-     * Las fechas se procesan secuencialmente para evitar disparar
-     * cientos de solicitudes simultáneas contra Federación.
+    /**
+     * Reconstruye la cartera histórica por lotes de días.
      *
-     * Los endpoints correspondientes a una misma fecha sí pueden
-     * consultarse en paralelo porque representan fuentes independientes
-     * del mismo feed diario.
+     * Las consultas de cada lote se ejecutan en paralelo, pero
+     * sus resultados se incorporan al estado cronológicamente.
+     *
+     * Esto conserva el criterio de reemplazo de movimientos
+     * utilizado por FedPatPolizaStateService.
      */
-    for (let indice = 0; indice < fechas.length; indice++) {
+    for (
+        let inicioLote = 0;
+        inicioLote < fechas.length;
+        inicioLote += DIAS_PARALELOS
+    ) {
 
-        const fecha = fechas.at(indice);
-
-        /*
-         * Con noUncheckedIndexedAccess evitamos asumir que el acceso
-         * por índice siempre devuelve un elemento.
-         */
-        if (fecha === undefined) {
-            continue;
-        }
-
-
-        console.log(
-            `[${indice + 1}/${fechas.length}] ${fecha}`
+        const fechasLote = fechas.slice(
+            inicioLote,
+            inicioLote + DIAS_PARALELOS
         );
 
+        /*
+        * Consultamos varios días simultáneamente.
+        *
+        * Promise.all conserva el orden de los resultados
+        * respecto del array original, independientemente
+        * del orden en que finalicen las solicitudes.
+        */
+        const resultadosLote = await Promise.all(
+            fechasLote.map(async fecha => {
 
-        const [
-            certificados,
-            endosos,
-            sumas,
-            productosDatos,
-            riesgosCubiertos,
-            componentes,
-            clientesFecha
-        ] = await Promise.all([
+                const [
+                    certificados,
+                    endosos,
+                    sumas,
+                    productosDatos,
+                    riesgosCubiertos,
+                    componentes,
+                    clientesFecha
+                ] = await Promise.all([
 
-            certificadosService.obtenerCertificados(fecha),
-            endososService.obtenerEndosos(fecha),
-            sumasService.obtenerCertificadosSumas(fecha),
-            productosDatosService.obtenerProductosDatos(fecha),
-            riesgosCubiertosService.obtenerRiesgosCubiertos(fecha),
-            componentesService.obtenerCertificadosComponentes(fecha),
-            clientesService.obtenerClientes(fecha)
+                    certificadosService.obtenerCertificados(fecha),
+                    endososService.obtenerEndosos(fecha),
+                    sumasService.obtenerCertificadosSumas(fecha),
+                    productosDatosService.obtenerProductosDatos(fecha),
+                    riesgosCubiertosService.obtenerRiesgosCubiertos(fecha),
+                    componentesService.obtenerCertificadosComponentes(fecha),
+                    clientesService.obtenerClientes(fecha)
 
-        ]);
+                ]);
 
+                const feed: FedPatFeedDiario = {
+                    fecha,
+                    certificados,
+                    endosos,
+                    sumas,
+                    productosDatos,
+                    riesgosCubiertos,
+                    componentes
+                };
+
+                return {
+                    fecha,
+                    feed,
+                    clientesFecha
+                };
+            })
+        );
 
         /*
-         * Todos los resultados corresponden a la misma fecha y forman
-         * una única unidad lógica de procesamiento.
-         *
-         * Los clientes no forman parte de FedPatFeedDiario porque
-         * se mantienen como información de referencia independiente.
-         */
-        const feed: FedPatFeedDiario = {
-            fecha,
-            certificados,
-            endosos,
-            sumas,
-            productosDatos,
-            riesgosCubiertos,
-            componentes
-        };
+        * Acumulamos los resultados en el orden original
+        * de fechas, desde la más antigua hasta la reciente.
+        *
+        * No se modifica el criterio de reconstrucción.
+        */
+        for (const resultado of resultadosLote) {
 
-        /*
-         * El StateService incorpora los movimientos al estado acumulado.
-         *
-         * Los registros repetidos se reemplazan utilizando sus claves
-         * naturales, evitando duplicaciones durante reprocesamientos.
-         */
-        stateService.acumularFeed(estados, feed);
+            stateService.acumularFeed(
+                estados,
+                resultado.feed
+            );
 
+            for (const cliente of resultado.clientesFecha) {
 
-        /*
-         * Los clientes se acumulan independientemente del estado
-         * de las pólizas.
-         *
-         * Si un mismo cliente aparece nuevamente en una fecha posterior,
-         * reemplazamos su versión anterior. Como las fechas se procesan
-         * cronológicamente, al finalizar conservamos la información más
-         * reciente conocida dentro del período consultado.
-         */
-        for (const cliente of clientesFecha) {
+                const claveCliente =
+                    `${cliente.tipo_asegurado}-${cliente.codigo}`;
 
-            const claveCliente = `${cliente.tipo_asegurado}-${cliente.codigo}`;
-
-            clientes.set(claveCliente, cliente);
+                clientes.set(claveCliente, cliente);
+            }
         }
 
-        console.log(`Estados acumulados: ${DateUtils.formatearNumero(estados.size)}`);
-        console.log(`Clientes acumulados: ${DateUtils.formatearNumero(clientes.size)}`);
+        const diasProcesados = Math.min(
+            inicioLote + fechasLote.length,
+            fechas.length
+        );
+
+        console.log(
+            `[${diasProcesados}/${fechas.length}] ` +
+            `Último día: ${fechasLote.at(-1) ?? "-"} | ` +
+            `Estados: ${DateUtils.formatearNumero(estados.size)} | ` +
+            `Clientes: ${DateUtils.formatearNumero(clientes.size)}`
+        );
     }
 
 
@@ -573,8 +590,69 @@ async function main(): Promise<void> {
             premioAnual: analisis.premioAnual,
             riesgos: analisis.riesgos,
             fechaProximaRefacturacion: analisis.fechaProximaRefacturacion,
-            estadoRefacturacion: analisis.estadoRefacturacion
+            estadoRefacturacion: analisis.estadoRefacturacion,
+            fechaProximaGestion: analisis.fechaProximaGestion,
+            tipoProximaGestion: analisis.tipoProximaGestion
         });
+
+
+
+
+
+
+        /**
+         * Diagnóstico temporal de refacturación mensual.
+         *
+         * Verifica que la fecha calculada por FedPatRiskEngine
+         * llegue correctamente al modelo Poliza normalizado.
+         *
+         * Caso validado:
+         * 35331993 - D/12 - Próxima refacturación 02/11/2026.
+         *
+         * No modifica datos ni ejecuta escrituras.
+         */
+        if (estado.numeroPoliza === 35331993) {
+
+            console.log("");
+            console.log("==================================================");
+            console.log("DIAGNÓSTICO REFACTURACIÓN 35331993");
+            console.log("==================================================");
+
+            console.log({
+                numeroPoliza: estado.numeroPoliza,
+
+                tipoFacturacion: certificado.tipo_facturacion,
+                cantidadFacturacion: certificado.cant_facturacion,
+
+                fechaCalculada:
+                    analisis.fechaProximaRefacturacion,
+
+                estadoCalculado:
+                    analisis.estadoRefacturacion,
+
+                fechaNormalizada:
+                    poliza.fechaProximaRefacturacion,
+
+                estadoNormalizado:
+                    poliza.estadoRefacturacion
+            });
+        }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
         /*

@@ -4,6 +4,8 @@ import { FirestoreEjecutivaRepository } from "../repositories/firestoreEjecutiva
 
 import { Poliza } from "../models/poliza";
 import { RenovacionesEjecutiva } from "../models/renovacionesEjecutiva";
+import { EstadoRefacturacion } from "../models/estadoRefacturacion";
+import { ECompania } from "../models/eCompania";
 
 
 /**
@@ -43,6 +45,9 @@ import { RenovacionesEjecutiva } from "../models/renovacionesEjecutiva";
  */
 export class RenovacionesService {
 
+    //Si no hay productor asociado lo enviamos a Mica
+    private readonly EJECUTIVA_DEFAULT_ID = "micaela-rocha";
+
     /**
      * Repository utilizado para consultar las pólizas
      * almacenadas en Firestore.
@@ -74,71 +79,48 @@ export class RenovacionesService {
     }
 
 
+    
     /**
-     * Obtiene las pólizas cuyo vencimiento ocurre durante
-     * el mes calendario siguiente a la fecha de referencia.
+     * Obtiene las pólizas cuya próxima gestión corresponde
+     * al mes calendario siguiente a la fecha de referencia.
      *
-     * El rango comprende desde el primer instante del primer
-     * día del mes siguiente hasta el último instante del
-     * último día de dicho mes.
+     * La fecha de gestión puede representar una refacturación
+     * pendiente o el vencimiento definitivo de la póliza.
      *
-     * Ejemplo:
-     *
-     * Si fechaReferencia es 20/09/2026:
-     *
-     *      desde: 01/10/2026 00:00:00.000
-     *      hasta: 31/10/2026 23:59:59.999
-     *
-     * La fecha de referencia se recibe como parámetro para
-     * permitir utilizar la fecha actual en producción y fechas
-     * simuladas durante pruebas.
-     *
-     * @param fechaReferencia fecha utilizada para determinar
-     * el mes cuyas renovaciones deben consultarse.
-     *
-     * @returns listado de pólizas que vencen durante
-     * el mes calendario siguiente.
-     *
-     * @see Poliza
-     * @see FirestorePolizaRepository
+     * @param fechaReferencia Fecha utilizada para determinar el período.
+     * @returns Pólizas con próxima gestión durante el mes siguiente.
      */
     async obtenerRenovacionesMesSiguiente(fechaReferencia: Date = new Date()): Promise<Poliza[]> {
 
-        /*
-         * Primer día del mes siguiente.
-         *
-         * JavaScript resuelve automáticamente los cambios
-         * de año al incrementar el número de mes.
-         *
-         * Ejemplo:
-         *
-         * diciembre 2026 + 1 mes -> enero 2027.
-         */
         const desde = new Date(fechaReferencia.getFullYear(),fechaReferencia.getMonth() + 1, 1);
         desde.setHours(0, 0, 0, 0);
 
-
-        /*
-         * El día 0 del mes posterior representa el último
-         * día del mes que necesitamos consultar.
-         *
-         * Ejemplo:
-         *
-         * new Date(2026, 10, 0)
-         *
-         * devuelve el último día de octubre de 2026.
-         */
-        const hasta = new Date(fechaReferencia.getFullYear(),fechaReferencia.getMonth() + 2,0);
+        const hasta = new Date(fechaReferencia.getFullYear(),fechaReferencia.getMonth() + 2, 0);
         hasta.setHours(23, 59, 59, 999);
 
+        // Obtenemos las pólizas candidatas según ambas fechas.
+        const polizas = await this.polizaRepository.obtenerProximasAGestionar(desde,hasta);
 
         /*
-         * El service determina el rango temporal correspondiente
-         * a la regla de negocio y delega al repository el acceso
-         * a Firestore.
-         */
-        return this.polizaRepository.obtenerProximasAVencer(desde, hasta);
+        * Conservamos únicamente las pólizas con riesgos detectados
+        * y cuya próxima gestión corresponde al mes solicitado.
+        *
+        * Utilizamos el mismo criterio de fechas que RiesgoService
+        * en Angular.
+        */
+        return polizas.filter(poliza => {
+
+            // El frontend de riesgos solamente muestra pólizas con riesgos.
+            if (!Array.isArray(poliza.riesgos) || poliza.riesgos.length === 0) {
+                return false;
+            }
+
+            const fechaGestion = this.obtenerFechaProximaGestion(poliza);
+
+            return fechaGestion !== null && fechaGestion >= desde && fechaGestion <= hasta;
+        });
     }
+
 
 
     /**
@@ -165,13 +147,16 @@ export class RenovacionesService {
      * 6. Resolver la ejecutiva correspondiente a cada póliza.
      * 7. Agrupar las pólizas por ejecutiva.
      *
-     * Si una póliza pertenece a un productor que no posee
-     * relación configurada, la póliza se omite y se registra
-     * una advertencia.
      *
-     * Si la relación existe pero la ejecutiva asociada no
-     * existe o se encuentra inactiva, también se omite la
-     * póliza y se registra una advertencia.
+     * Si una póliza pertenece a un productor sin relación
+     * configurada, se asigna virtualmente a Micaela Rocha.
+     *
+     * Esta asignación se utiliza exclusivamente para agrupar
+     * las renovaciones. No se persiste en Firestore.
+     *
+     * Si existe una relación con una ejecutiva inexistente
+   * o inactiva, se registra una advertencia y se omite.
+     *
      *
      * @param fechaReferencia fecha utilizada para determinar
      * el mes cuyas renovaciones deben procesarse.
@@ -266,6 +251,15 @@ export class RenovacionesService {
             )
         );
 
+        const ejecutivaDefault = ejecutivasPorId.get(this.EJECUTIVA_DEFAULT_ID);
+        
+        if (!ejecutivaDefault) {
+            throw new Error(
+                `La ejecutiva por defecto ${this.EJECUTIVA_DEFAULT_ID} ` +
+                `no existe o está inactiva.`
+            );
+        }
+
 
         /*
          * Mapa utilizado para construir el resultado final.
@@ -299,50 +293,45 @@ export class RenovacionesService {
             /*
              * Buscamos la relación productor-ejecutiva.
              */
+            
             const relacion = relacionesPorProductor.get(claveProductor);
 
+            let ejecutiva;
 
-            /*
-             * Si no existe una relación configurada para
-             * este productor, no podemos determinar qué
-             * ejecutiva debe recibir la renovación.
-             */
             if (!relacion) {
 
-                console.warn(`Productor sin ejecutiva asignada: ` + `${poliza.compania} - ` +
-                    `${poliza.productor.codigo} - ` + `${poliza.productor.nombre}`
+                // No existe relación: asignación virtual a Micaela.
+                ejecutiva = ejecutivaDefault;
+
+                console.warn(
+                    `[RENOVACIONES] Productor sin relación. ` +
+                    `Asignado por defecto a ${ejecutiva.nombre} ${ejecutiva.apellido}: ` +
+                    `${poliza.compania} - ` +
+                    `${poliza.productor.codigo} - ` +
+                    `${poliza.productor.nombre}`
                 );
 
-                continue;
+            } else {
+
+                // Existe relación: respetamos la ejecutiva configurada.
+                ejecutiva = ejecutivasPorId.get(relacion.ejecutivaId);
+
+                if (!ejecutiva) {
+
+                    console.warn(
+                        `[RENOVACIONES] Ejecutiva inexistente o inactiva: ` +
+                        `${relacion.ejecutivaId} - ` +
+                        `Productor: ${poliza.compania} - ` +
+                        `${poliza.productor.codigo} - ` +
+                        `${poliza.productor.nombre}`
+                    );
+
+                    continue;
+                }
             }
 
 
-            /*
-             * A partir del ejecutivaId almacenado en la
-             * relación obtenemos los datos completos de
-             * la ejecutiva.
-             *
-             * El Map contiene solamente ejecutivas activas.
-             */
-            const ejecutiva = ejecutivasPorId.get(relacion.ejecutivaId);
-
-
-            /*
-             * Si no encontramos la ejecutiva significa que:
-             *
-             * - el ID configurado en la relación no existe, o
-             * - la ejecutiva existe pero está inactiva.
-             *
-             * En cualquiera de los dos casos evitamos incluir
-             * la póliza en el proceso automático.
-             */
-            if (!ejecutiva) {
-
-                console.warn(`Ejecutiva inexistente o inactiva: ` + `${relacion.ejecutivaId} - ` +
-                    `Productor: ${poliza.compania} - ` + `${poliza.productor.codigo} - ` + `${poliza.productor.nombre}`);
-
-                continue;
-            }
+        
 
 
             /*
@@ -380,4 +369,35 @@ export class RenovacionesService {
          */
         return Array.from(agrupadas.values());
     }
+
+
+    
+
+    /**
+     * Determina la fecha de próxima gestión de una póliza
+     * utilizando el mismo criterio que el frontend Angular.
+     *
+     * Mercantil Andina y Río Uruguay:
+     *   - Fecha de finalización del período de facturación.
+     *
+     * Federación Patronal:
+     *   - Fecha de próxima gestión calculada por el backend,
+     *     que puede representar renovación o refacturación.
+     *
+     * @param poliza Póliza que se desea evaluar.
+     * @returns Fecha de próxima gestión o null.
+     */
+    public obtenerFechaProximaGestion(poliza: Poliza): Date | null {
+
+        if (poliza.compania === ECompania.FEDERACION_PATRONAL) {
+            return poliza.fechaProximaGestion ?? null;
+        }
+
+        return poliza.facturacion?.hasta ?? null;
+    }
+
+
+
+
+
 }

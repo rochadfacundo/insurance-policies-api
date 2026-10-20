@@ -5,6 +5,7 @@ import { EstadoRefacturacion } from "./estadoRefacturacion";
 import { Facturacion } from "./facturacion";
 import { Productor, ProductorBase } from "./productor";
 import { Riesgo } from "./riesgo";
+import { TipoProximaGestion } from "./tipoProximaGestion";
 import { TipoRiesgo } from "./TipoRiesgo";
 import { Vigencia } from "./vigencia";
 
@@ -57,4 +58,20 @@ export interface Poliza {
   fechaCreacion?: Date;
   fechaActualizacion?: Date;
 
+
+  /**
+   * Fecha del próximo evento que requiere gestión comercial.
+   *
+   * Puede corresponder a una refacturación periódica
+   * o a una renovación de la póliza.
+   */
+  fechaProximaGestion?: Date;
+
+  /**
+   * Identifica la operación asociada a fechaProximaGestion.
+   *
+   * REFACTURACION: nuevo período de facturación.
+   * RENOVACION: finalización de la vigencia contractual.
+   */
+  tipoProximaGestion?: TipoProximaGestion;
 }

@@ -51,7 +51,7 @@ dotenv.config({ path: path.resolve(process.cwd(),"../.env")});
  * sincroniza los riesgos actuales de Federación Patronal
  * contra la colección `polizas`.
  */
-const ESCRIBIR_FIRESTORE = true;
+const GUARDAR_BD = true;
 
 /**
  * Cantidad máxima de días consultados simultáneamente.
@@ -100,28 +100,20 @@ async function main(): Promise<void> {
     console.log("SINCRONIZACIÓN DE RIESGOS FEDERACIÓN PATRONAL");
     console.log("==================================================");
     console.log(`Período: ${FECHA_DESDE} -> ${FECHA_HASTA}`);
-    console.log(`Escribir Firestore: ${ESCRIBIR_FIRESTORE}`);
+    console.log(`Escribir Firestore: ${GUARDAR_BD}`);
 
     /*
      * Todos los servicios de Federación comparten la misma instancia
      * de autenticación.
      */
     const authService = new FedPatAuthService();
-
     const certificadosService = new FedPatCertificadosService(authService);
-
     const endososService = new FedPatCertificadosEndososService(authService);
-
     const sumasService = new FedPatCertificadosSumasService(authService);
-
     const productosDatosService = new FedPatProductosDatosService(authService);
-
     const riesgosCubiertosService = new FedPatRiesgosCubiertosService(authService);
-
     const componentesService = new FedPatCertificadosComponentesService(authService);
-
     const datosService = new FedPatDatosService(authService);
-
     const tablasService = new FedPatTablasService(authService);
 
     /*
@@ -192,7 +184,7 @@ async function main(): Promise<void> {
      * está habilitada, evitando inicializar Firestore durante
      * ejecuciones puramente diagnósticas.
      */
-    const polizaRepository = ESCRIBIR_FIRESTORE
+    const polizaRepository = GUARDAR_BD
         ? new FirestorePolizaRepository()
         : null;
 
@@ -241,16 +233,9 @@ async function main(): Promise<void> {
      * Esto conserva el criterio de reemplazo de movimientos
      * utilizado por FedPatPolizaStateService.
      */
-    for (
-        let inicioLote = 0;
-        inicioLote < fechas.length;
-        inicioLote += DIAS_PARALELOS
-    ) {
+    for (let inicioLote = 0; inicioLote < fechas.length; inicioLote += DIAS_PARALELOS) {
 
-        const fechasLote = fechas.slice(
-            inicioLote,
-            inicioLote + DIAS_PARALELOS
-        );
+        const fechasLote = fechas.slice(inicioLote, inicioLote + DIAS_PARALELOS);
 
         /*
         * Consultamos varios días simultáneamente.
@@ -308,24 +293,17 @@ async function main(): Promise<void> {
         */
         for (const resultado of resultadosLote) {
 
-            stateService.acumularFeed(
-                estados,
-                resultado.feed
-            );
+            stateService.acumularFeed(estados, resultado.feed);
 
             for (const cliente of resultado.clientesFecha) {
 
-                const claveCliente =
-                    `${cliente.tipo_asegurado}-${cliente.codigo}`;
+                const claveCliente = `${cliente.tipo_asegurado}-${cliente.codigo}`;
 
                 clientes.set(claveCliente, cliente);
             }
         }
 
-        const diasProcesados = Math.min(
-            inicioLote + fechasLote.length,
-            fechas.length
-        );
+        const diasProcesados = Math.min(inicioLote + fechasLote.length, fechas.length);
 
         console.log(
             `[${diasProcesados}/${fechas.length}] ` +
@@ -474,10 +452,7 @@ async function main(): Promise<void> {
 
         if (certificado === null) {
 
-        console.warn(
-            `⚠ ${estado.codigoRamo}/${estado.numeroPoliza} ` +
-            "sin certificado principal"
-        );
+        console.warn(`⚠ ${estado.codigoRamo}/${estado.numeroPoliza} ` + "sin certificado principal");
 
         continue;
         }
@@ -623,18 +598,10 @@ async function main(): Promise<void> {
 
                 tipoFacturacion: certificado.tipo_facturacion,
                 cantidadFacturacion: certificado.cant_facturacion,
-
-                fechaCalculada:
-                    analisis.fechaProximaRefacturacion,
-
-                estadoCalculado:
-                    analisis.estadoRefacturacion,
-
-                fechaNormalizada:
-                    poliza.fechaProximaRefacturacion,
-
-                estadoNormalizado:
-                    poliza.estadoRefacturacion
+                fechaCalculada: analisis.fechaProximaRefacturacion,
+                estadoCalculado: analisis.estadoRefacturacion,
+                fechaNormalizada: poliza.fechaProximaRefacturacion,
+                estadoNormalizado: poliza.estadoRefacturacion
             });
         }
 
@@ -725,7 +692,7 @@ async function main(): Promise<void> {
      * riesgos almacenados previamente que ya no existan en la
      * reconstrucción actual.
      */
-    if (ESCRIBIR_FIRESTORE && polizaRepository !== null) {
+    if (GUARDAR_BD && polizaRepository !== null) {
 
         console.log("");
         console.log("==================================================");
@@ -739,14 +706,9 @@ async function main(): Promise<void> {
              * Seleccionamos únicamente las pólizas riesgosas
              * correspondientes al productor actual.
              */
-            const riesgosProductor = polizasConRiesgo.filter(poliza =>
-                    poliza.productor.codigo === productor.codigo
-            );
+            const riesgosProductor = polizasConRiesgo.filter(poliza =>  poliza.productor.codigo === productor.codigo);
         
-            console.log(
-                `${productor.codigo} - ${productor.nombre}: ` +
-                `${riesgosProductor.length} riesgos`
-            );
+            console.log(`${productor.codigo} - ${productor.nombre}: ` + `${riesgosProductor.length} riesgos`);
         
             /**
              * Reconciliamos el estado actual de riesgos del productor
@@ -779,30 +741,27 @@ async function main(): Promise<void> {
     console.log("RESULTADO");
     console.log("==================================================");
 
-    console.log(`Pólizas procesadas:       ${DateUtils.formatearNumero(estados.size)}`);
-    console.log(`Sin riesgo:               ${DateUtils.formatearNumero(sinRiesgo)}`);
-    console.log(`Con algún riesgo:         ${DateUtils.formatearNumero(conRiesgo)}`);
+    console.log(`Pólizas procesadas: ${DateUtils.formatearNumero(estados.size)}`);
+    console.log(`Sin riesgo:         ${DateUtils.formatearNumero(sinRiesgo)}`);
+    console.log(`Con algún riesgo:   ${DateUtils.formatearNumero(conRiesgo)}`);
 
     console.log("");
 
-    console.log(`FLOTA:                    ${DateUtils.formatearNumero(flota)}`);
-    console.log(`PRIMA_ALTA:               ${DateUtils.formatearNumero(primaAlta)}`);
-    console.log(`PREMIO_ALTO:              ${DateUtils.formatearNumero(premioAlto)}`);
-    console.log(`Más de un riesgo:         ${DateUtils.formatearNumero(multiplesRiesgos)}`);
+    console.log(`FLOTA:              ${DateUtils.formatearNumero(flota)}`);
+    console.log(`PRIMA_ALTA:         ${DateUtils.formatearNumero(primaAlta)}`);
+    console.log(`PREMIO_ALTO:        ${DateUtils.formatearNumero(premioAlto)}`);
+    console.log(`Más de un riesgo:   ${DateUtils.formatearNumero(multiplesRiesgos)}`);
 
     console.log("");
 
-    console.log(
-        "--------------------------------------------------"
-    );
-
+    console.log("--------------------------------------------------");
     console.log(`PÓLIZAS NORMALIZADAS:     ${DateUtils.formatearNumero(polizasConRiesgo.length)}`);
     console.log("--------------------------------------------------");
     console.log("");
 
     console.log(`Duración total: ${DateUtils.formatearDuracion(duracion)}`);
 
-    if (ESCRIBIR_FIRESTORE) {
+    if (GUARDAR_BD) {
 
         console.log("");
         console.log("RESULTADO FIRESTORE");

@@ -6,10 +6,7 @@ import {FirestoreStatsCarteraRepository} from "../src/repositories/firestoreStat
 
 
 function formatearFecha(fecha: Date): string {
-
-    return fecha
-        .toISOString()
-        .slice(0, 10);
+    return fecha.toISOString().slice(0, 10);
 }
 
 
@@ -22,7 +19,6 @@ async function main(): Promise<void> {
     }
 
     const statsService = new RusStatsCarteraService();
-
     const statsRepository = new FirestoreStatsCarteraRepository();
 
 
@@ -30,32 +26,20 @@ async function main(): Promise<void> {
      * Cartera anual móvil.
      */
     const hasta = new Date();
-
     const desde = new Date(hasta);
 
     desde.setFullYear(desde.getFullYear() - 1);
 
     const fechaDesde = formatearFecha(desde);
-
     const fechaHasta = formatearFecha(hasta);
 
 
     console.log("");
-    console.log(
-        "=================================================="
-    );
-    console.log(
-        "ESTADÍSTICAS CARTERA RUS"
-    );
-    console.log(
-        "=================================================="
-    );
+    console.log("==================================================");
+    console.log("ESTADÍSTICAS CARTERA RUS");
+    console.log("==================================================");
 
-    console.log({
-        productoresTotales: productores.length,
-        fechaDesde,
-        fechaHasta
-    });
+    console.log({productoresTotales: productores.length,fechaDesde,fechaHasta });
 
 
     for (const [index, productor] of productores.entries()) {
@@ -70,31 +54,20 @@ async function main(): Promise<void> {
 
         try {
 
-            const estadistica =
-                await statsService.obtener(productor,fechaDesde,fechaHasta);
-
+            const estadistica = await statsService.obtener(productor,fechaDesde,fechaHasta);
 
             await statsRepository.guardar(estadistica);
 
 
             console.log({
-                matricula:
-                    estadistica.matricula,
-
-                cantidadPolizas:
-                    estadistica.cantidadPolizas,
-
-                grupoCartera:
-                    estadistica.grupoCartera ?? null
+                matricula:estadistica.matricula,
+                cantidadPolizas:estadistica.cantidadPolizas,
+                grupoCartera:estadistica.grupoCartera ?? null
             });
 
 
         } catch (error) {
-
-            console.error(
-                `Error procesando productor ${productor.codigo}:`,
-                error
-            );
+            console.error(`Error procesando productor ${productor.codigo}:`,error);
         }
     }
 
@@ -108,7 +81,6 @@ async function main(): Promise<void> {
 
 main()
     .then(() => {
-
         console.log("");
         console.log("Proceso finalizado.");
 

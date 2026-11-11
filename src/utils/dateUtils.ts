@@ -17,16 +17,9 @@ export class DateUtils {
  */
 static formatearFechaDDMMYYYY(fecha: Date): string {
 
-    const dia =
-        String(fecha.getDate())
-            .padStart(2, "0");
-
-    const mes =
-        String(fecha.getMonth() + 1)
-            .padStart(2, "0");
-
-    const anio =
-        fecha.getFullYear();
+    const dia = String(fecha.getDate()).padStart(2, "0");
+    const mes = String(fecha.getMonth() + 1).padStart(2, "0");
+    const anio = fecha.getFullYear();
 
     return `${dia}/${mes}/${anio}`;
 }
@@ -106,16 +99,10 @@ static formatearFechaDDMMYYYY(fecha: Date): string {
             return false;
         }
 
-        const fechaFin = new Date(
-            anio,
-            mes - 1,
-            dia
-        );
-
+        const fechaFin = new Date(anio, mes - 1, dia);
         fechaFin.setHours(0, 0, 0, 0);
 
         const hoy = new Date();
-
         hoy.setHours(0, 0, 0, 0);
 
         return fechaFin.getTime() < hoy.getTime();
@@ -129,7 +116,6 @@ static formatearFechaDDMMYYYY(fecha: Date): string {
      * del proceso.
      */
     static formatearNumero(valor: number): string {
-
         return valor.toLocaleString("es-AR");
     }
 
@@ -146,8 +132,7 @@ static formatearFechaDDMMYYYY(fecha: Date): string {
      */
     static parsearFechaDDMMYYYY(fecha: string): Date {
 
-        const partes =
-            fecha.split("/");
+        const partes = fecha.split("/");
 
         if (partes.length !== 3) {
             throw new Error(
@@ -155,31 +140,15 @@ static formatearFechaDDMMYYYY(fecha: Date): string {
             );
         }
 
-        const dia =
-            Number(partes.at(0));
+        const dia = Number(partes.at(0));
+        const mes = Number(partes.at(1));
+        const anio = Number(partes.at(2));
 
-        const mes =
-            Number(partes.at(1));
-
-        const anio =
-            Number(partes.at(2));
-
-        if (
-            !Number.isInteger(dia) ||
-            !Number.isInteger(mes) ||
-            !Number.isInteger(anio)
-        ) {
-            throw new Error(
-                `Formato de fecha inválido: ${fecha}`
-            );
+        if (!Number.isInteger(dia) || !Number.isInteger(mes) || !Number.isInteger(anio)) {
+            throw new Error(`Formato de fecha inválido: ${fecha}`);
         }
 
-        const resultado =
-            new Date(
-                anio,
-                mes - 1,
-                dia
-            );
+        const resultado = new Date(anio, mes - 1, dia);
 
         /*
         * Verificamos nuevamente los componentes porque JavaScript
@@ -188,14 +157,8 @@ static formatearFechaDDMMYYYY(fecha: Date): string {
         * Por ejemplo, new Date(2026, 1, 31) termina representando
         * una fecha de marzo en lugar de lanzar un error.
         */
-        if (
-            resultado.getFullYear() !== anio ||
-            resultado.getMonth() !== mes - 1 ||
-            resultado.getDate() !== dia
-        ) {
-            throw new Error(
-                `Fecha inválida: ${fecha}`
-            );
+        if (resultado.getFullYear() !== anio || resultado.getMonth() !== mes - 1 || resultado.getDate() !== dia) {
+            throw new Error(`Fecha inválida: ${fecha}`);
         }
 
         return resultado;
@@ -213,7 +176,6 @@ static formatearFechaDDMMYYYY(fecha: Date): string {
     static restarDiasDDMMYYYY(fecha: string,dias: number): string {
 
         const resultado = this.parsearFechaDDMMYYYY(fecha);
-
         resultado.setDate(resultado.getDate() - dias);
 
         return this.formatearFechaDDMMYYYY(resultado);
@@ -223,7 +185,6 @@ static formatearFechaDDMMYYYY(fecha: Date): string {
      * Convierte un string YYYY-MM-DD a Date.
      */
     static parse(fecha: string): Date {
-
         return new Date(`${fecha}T00:00:00`);
     }
 
@@ -234,16 +195,13 @@ static formatearFechaDDMMYYYY(fecha: Date): string {
 
         const MS_POR_DIA = 1000 * 60 * 60 * 24;
 
-        return Math.round(
-            (hasta.getTime() - desde.getTime()) / MS_POR_DIA
-        );
+        return Math.round((hasta.getTime() - desde.getTime()) / MS_POR_DIA);
     }
 
     /**
      * Devuelve los días que faltan desde hoy.
      */
     static diasHasta(fecha: Date): number {
-
         return this.diasEntre(new Date(), fecha);
     }
 
@@ -256,11 +214,7 @@ static formatearFechaDDMMYYYY(fecha: Date): string {
  */
 static obtenerMesRenovacion(fechaReferencia: Date): string {
 
-    const mesSiguiente = new Date(
-        fechaReferencia.getFullYear(),
-        fechaReferencia.getMonth() + 1,
-        1
-    );
+    const mesSiguiente = new Date(fechaReferencia.getFullYear(), fechaReferencia.getMonth() + 1,1);
 
     const texto = mesSiguiente.toLocaleDateString(
         "es-AR",
@@ -282,7 +236,6 @@ static obtenerMesRenovacion(fechaReferencia: Date): string {
     static estaVigente(desde: Date,hasta: Date): boolean {
 
         const hoy = new Date();
-
         return hoy >= desde && hoy <= hasta;
     }
 
@@ -336,9 +289,7 @@ static obtenerMesRenovacion(fechaReferencia: Date): string {
     static parsearFechaConFallback(valor: string | null | undefined,fallback: Date): Date {
 
         if (!valor?.trim()) {
-            return new Date(
-                fallback.getTime()
-            );
+            return new Date(fallback.getTime());
         }
 
         const fecha = new Date(`${valor.substring(0, 10)}T00:00:00`);

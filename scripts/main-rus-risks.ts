@@ -13,7 +13,7 @@ import { EstadoSincronizacionRus, RusSyncState } from "../src/companias/rus/mode
 /**
  * Habilita o deshabilita la reconciliación en Firestore.
  */
-const ESCRIBIR_FIRESTORE = true;
+const GUARDAR_BD = true;
 
 /**
  * Habilita o deshabilita la reconstrucción completa de la cartera.
@@ -40,7 +40,7 @@ async function main(): Promise<void> {
     const productores: ProductorRUS[] =  obtenerProductoresRUS();
   
 
-    //.filter(p => p.codigo === 15977);
+    //.filter(p => p.codigo === 10848);
 
     console.log(`Se encontraron ${productores.length} productores activos para procesar.`);
 
@@ -74,7 +74,7 @@ async function main(): Promise<void> {
     console.log(`Productores seleccionados: ${productores.length}`);
     console.log(`Fecha desde: ${FECHA_DESDE}`);
     console.log(`Fecha hasta: ${FECHA_HASTA}`);
-    console.log(`Escribir Firestore: ${ESCRIBIR_FIRESTORE}`);
+    console.log(`Escribir Firestore: ${GUARDAR_BD}`);
     console.log("==================================================");
 
     for (let indice = 0;  indice < productores.length; indice++) {
@@ -135,10 +135,7 @@ async function main(): Promise<void> {
         const estadoSincronizacion: RusSyncState = {
             id: rusSyncStateRepository.construirId(productor.codigo),
 
-            productor: {
-                codigo: productor.codigo,
-                nombre: productor.nombre
-            },
+            productor: { codigo: productor.codigo, nombre: productor.nombre },
             modo: modoActual,
             estado: EstadoSincronizacionRus.EN_PROCESO,
             bootstrapCompleto: estadoAnterior?.bootstrapCompleto ?? false,
@@ -151,7 +148,7 @@ async function main(): Promise<void> {
 
         try {
 
-            if (ESCRIBIR_FIRESTORE) {
+            if (GUARDAR_BD) {
                 await rusSyncStateRepository.marcarEnProceso(estadoSincronizacion);
             }
 
@@ -198,7 +195,7 @@ async function main(): Promise<void> {
                 );
             }
 
-            if (!ESCRIBIR_FIRESTORE) {
+            if (!GUARDAR_BD) {
                 console.log("Modo diagnóstico: no se realizaron " +"escrituras en Firestore.");
                 productoresExitosos++;
                 continue;
@@ -237,7 +234,7 @@ async function main(): Promise<void> {
                 detalle:error?.response?.data
             };
 
-            if (ESCRIBIR_FIRESTORE) {
+            if (GUARDAR_BD) {
                 await rusSyncStateRepository.marcarError(estadoSincronizacion, errorProductor.mensaje);
             }
 

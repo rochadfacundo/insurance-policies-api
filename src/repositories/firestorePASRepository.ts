@@ -106,4 +106,72 @@ export class FirestorePASRepository {
             id: doc.id
         } as PAS));
     }
+
+    /**
+ * Importa un conjunto de PAS mediante una operación atómica.
+ *
+ * Requiere que la colección de destino esté vacía.
+ * Utiliza identificadores estables para evitar duplicaciones
+ * ante ejecuciones repetidas del importador.
+ *
+ * Si alguna creación falla, no se confirma el lote.
+ *
+ * @param productores - PAS previamente validados.
+ * @returns Cantidad de documentos creados.
+ */
+async importarInicial(productores: PAS[]): Promise<number> {
+
+    const coleccion = this.firestore.collection(this.COLLECTION_NAME);
+
+    // La importación inicial no debe modificar datos existentes.
+    const existentes = await coleccion.limit(1).get();
+
+    if (!existentes.empty) {
+        throw new Error(
+            "La colección productores no está vacía. " +
+            "Se canceló la importación para proteger los datos existentes."
+        );
+    }
+
+    if (productores.length === 0 || productores.length > 500) {
+        throw new Error(
+            "La importación requiere entre 1 y 500 productores."
+        );
+    }
+
+    const ids = productores.map(productor => productor.id);
+
+    if (ids.some(id => !id || id.includes("/"))) {
+        throw new Error("Se encontraron identificadores inválidos.");
+    }
+
+    if (new Set(ids).size !== ids.length) {
+        throw new Error("Se encontraron identificadores duplicados.");
+    }
+
+    const batch = this.firestore.batch();
+    const fecha = Timestamp.now();
+
+    for (const productor of productores) {
+
+        const referencia = coleccion.doc(productor.id);
+
+        const {
+            id,
+            fechaCreacion,
+            fechaActualizacion,
+            ...datos
+        } = productor;
+
+        batch.create(referencia, {
+            ...datos,
+            fechaCreacion: fecha,
+            fechaActualizacion: fecha
+        });
+    }
+
+    await batch.commit();
+
+    return productores.length;
+}
 }

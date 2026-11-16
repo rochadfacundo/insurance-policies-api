@@ -18,21 +18,6 @@ token.json
 tokens/
 tokens/*
 
-# =========================
-# Carpeta puntual de archivos 
-# =========================
-mercantil/models/data/
-mercantil/models/data/*
-mercantil/models/data/*.json
-
-rus/models/data/
-rus/models/data/*
-rus/models/data/*.json
-
-fedpat/models/data/
-fedpat/models/data/*
-fedpat/models/data/*.json
-
 
 # =========================
 # Build
@@ -67,13 +52,35 @@ Thumbs.db
 *.tsbuildinfo
 
 # =========================
-# test JSONs
+# JSON
 # =========================
+
+
 *.json
 
+!package.json
+!package-lock.json
+!tsconfig.json
+
 # =========================
-# test excels
+# Datos de compañías
 # =========================
+
+src/companias/mercantil/models/data/
+src/companias/rus/models/data/
+src/companias/fedpat/models/data/
+
+# =========================
+# Datos de scripts
+# =========================
+
+scripts/data/
+scripts/resultado-*.json
+
+# =========================
+# Excel
+# =========================
+
 *.xlsx
 
 # =========================

@@ -11,7 +11,9 @@ exports.apiCartera = (0, https_1.onRequest)({
     memory: '256MiB',
     maxInstances: 10,
     cors: [
-        'http://localhost:4200'
+        "http://localhost:4200",
+        "https://tecnicayservicios.com.ar",
+        "https://www.tecnicayservicios.com.ar",
     ]
 }, app_1.default);
 //# sourceMappingURL=index.js.map

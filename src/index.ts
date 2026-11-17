@@ -7,7 +7,9 @@ export const apiCartera = onRequest(
       memory: '256MiB',
       maxInstances: 10,
       cors: [
-        'http://localhost:4200'
+        "http://localhost:4200",
+        "https://tecnicayservicios.com.ar",
+        "https://www.tecnicayservicios.com.ar",
       ]
     },
     app

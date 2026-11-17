@@ -1,3 +1,4 @@
+
 import {
     applicationDefault,
     getApps,
@@ -14,14 +15,16 @@ import dotenv from "dotenv";
 
 const rootPath = path.resolve(__dirname, "../..");
 
+// Cargar variables locales cuando exista .env
 dotenv.config({
     path: path.join(rootPath, ".env")
 });
 
+// Resolver credenciales locales relativas al proyecto
 const credentialsPath =
     process.env["GOOGLE_APPLICATION_CREDENTIALS"];
 
-if (credentialsPath) {
+if (credentialsPath && !path.isAbsolute(credentialsPath)) {
     process.env["GOOGLE_APPLICATION_CREDENTIALS"] =
         path.resolve(rootPath, credentialsPath);
 }
@@ -36,15 +39,10 @@ export class FirebaseConfig {
             return this.firestore;
         }
 
-        const projectId = process.env["FIREBASE_PROJECT_ID"];
-
-        if (!projectId) {
-            throw new Error("Falta la variable FIREBASE_PROJECT_ID en el archivo .env");
-        }
-
-
         if (getApps().length === 0) {
-            initializeApp({ credential: applicationDefault(), projectId });
+            initializeApp({
+                credential: applicationDefault()
+            });
         }
 
         this.firestore = getFirestore();

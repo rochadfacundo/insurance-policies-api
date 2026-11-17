@@ -10,6 +10,7 @@ node_modules/
 .env.local
 .env.development
 .env.production
+.env.scripts.backup
 
 # =========================
 # Tokens / Credentials
@@ -24,6 +25,9 @@ tokens/*
 # =========================
 dist/
 build/
+/lib/
+
+
 
 # =========================
 # Logs
@@ -87,6 +91,7 @@ scripts/resultado-*.json
 # annotations
 # =========================
 tip.txt
+tip_deploy.txt
 
 # =========================
 # credenciales firebase

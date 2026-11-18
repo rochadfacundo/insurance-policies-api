@@ -8,7 +8,7 @@ import {
 
 const router = Router();
 
-// Todas las rutas requieren autenticación y rol Administrador
+// Por ahora todas las rutas requieren autenticación y rol Administrador
 router.use(authAdministrador);
 
 // GET /productores

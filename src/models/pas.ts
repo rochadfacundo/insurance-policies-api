@@ -12,6 +12,14 @@ import {
 export type EstadoPAS = | "ACTIVO" | "BAJA" | "PENDIENTE";
 
 /**
+ * Tipo de gestión del PAS dentro de Técnica y Servicios.
+ */
+export type TipoGestionPAS =
+  | "EJECUTIVA_ASIGNADA"
+  | "AUTOGESTIONADO"
+  | "SIN_ASIGNAR";
+
+/**
  * Información de contacto del PAS.
  *
  * Los campos son opcionales porque la agenda de origen
@@ -165,6 +173,9 @@ export interface PAS {
    */
   productorSuperiorId?: string | null;
 
+  // Gestión interna
+  tipoGestion?: TipoGestionPAS;
+
   // Trazabilidad y auditoría
 
   /**
@@ -189,3 +200,4 @@ export interface PAS {
   /** Fecha de la última modificación del registro. */
   fechaActualizacion?: Date;
 }
+

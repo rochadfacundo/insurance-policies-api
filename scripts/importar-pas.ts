@@ -5,7 +5,7 @@ import * as path from "path";
 import * as admin from "firebase-admin";
 import { FirestorePASRepository } from "../src/repositories/firestorePASRepository";
 
-import { PAS, EstadoPAS } from "../src/models/pas";
+import { PAS, EstadoPAS, TipoGestionPAS } from "../src/models/pas";
 
 import {
   CodigoAseguradora,
@@ -39,6 +39,11 @@ const IMPORTAR = process.argv.includes("--importar");
 const MATRICULA_UNIFICABLE = "87377";
 
 const EMAIL_UNIFICADO = "gmasesoradeseguros@gmail.com";
+
+// Productores que gestionan su propia cartera.
+const EJECUTIVOS_AUTOGESTIONADOS = new Set([
+  "DEMARCHI"
+]);
 
 // ============================================================
 // COLUMNAS DEL EXCEL
@@ -783,10 +788,29 @@ function transformarFila(
   );
 
   // Ejecutiva responsable.
-  const ejecutivoExcel = obtenerTexto(
-    fila,
-    COLUMNAS.EJECUTIVO
-  );
+  const ejecutivoExcel = obtenerTexto(fila,COLUMNAS.EJECUTIVO);
+
+  // El tipo de gestión se determina a partir del nombre de la ejecutiva.
+  const EJECUTIVOS_AUTOGESTIONADOS = new Set([
+    "DEMARCHI"
+  ]);
+  
+  const normalizarNombre = (valor: string): string =>
+    valor
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .trim()
+      .toUpperCase();
+  
+  const ejecutivoNormalizado = ejecutivoExcel
+    ? normalizarNombre(ejecutivoExcel)
+    : null;
+  
+  const tipoGestion: TipoGestionPAS = !ejecutivoNormalizado
+    ? "SIN_ASIGNAR"
+    : EJECUTIVOS_AUTOGESTIONADOS.has(ejecutivoNormalizado)
+      ? "AUTOGESTIONADO"
+      : "EJECUTIVA_ASIGNADA";
 
   // Relaciones con aseguradoras.
   const companias: CodigoAseguradora[] = [];
@@ -895,6 +919,8 @@ function transformarFila(
 
     // Se resolverá contra la colección ejecutivas.
     ejecutivaId: null,
+
+    tipoGestion,
 
     contacto: {
 

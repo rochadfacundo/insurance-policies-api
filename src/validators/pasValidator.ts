@@ -1,9 +1,15 @@
-import { PAS } from "../models/pas";
+import { PAS, TipoGestionPAS } from "../models/pas";
 import { EstadoCodigoAseguradora,  EstadoRC} from "../models/aseguradora";
 
 
 
 const ESTADOS_PAS = ["ACTIVO", "BAJA", "PENDIENTE"];
+
+const TIPOS_GESTION: TipoGestionPAS[] = [
+  "EJECUTIVA_ASIGNADA",
+  "AUTOGESTIONADO",
+  "SIN_ASIGNAR"
+];
 
 const ESTADOS_RC: EstadoRC[] = [
   "VIGENTE",
@@ -100,6 +106,14 @@ export const esPASValido = (valor: unknown): valor is PAS => {
     ESTADOS_RC.includes(valor["estadoRC"] as EstadoRC) &&
 
     esTextoOpcional(valor["ejecutivaId"]) &&
+
+    (
+      valor["tipoGestion"] === undefined ||
+      TIPOS_GESTION.includes(
+        valor["tipoGestion"] as TipoGestionPAS
+      )
+    ) &&
+
     esContactoValido(valor["contacto"]) &&
 
     Array.isArray(valor["companias"]) &&

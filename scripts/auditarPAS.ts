@@ -29,9 +29,7 @@ async function auditarPAS(): Promise<void> {
         } else {
             invalidos++;
 
-            console.error(
-                `PAS inválido: ${doc.id} | ${doc.get("nombre") ?? "Sin nombre"}`
-            );
+            console.error(`PAS inválido: ${doc.id} | ${doc.get("nombre") ?? "Sin nombre"}`);
         }
     }
 

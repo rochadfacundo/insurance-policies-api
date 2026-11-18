@@ -6,16 +6,24 @@ const { createRequire } = require("module");
 const origen = path.resolve(__dirname, "../lib");
 const destino = path.resolve(__dirname, "../functions-cartera/lib");
 
+const limpiar = process.argv.includes("--clean");
+
 const pendientes = ["index.js"];
 const procesados = new Set();
+const dependenciasDinamicas = [];
 
-function sincronizar(archivo) {
+// Archivos adicionales que se cargan dinámicamente.
+// Agregar rutas relativas a lib cuando sea necesario.
+const archivosAdicionales = [];
+
+function dentroDe(directorio, archivo) {
+  return archivo.startsWith(directorio + path.sep);
+}
+
+function recorrer(archivo) {
   const rutaOrigen = path.resolve(origen, archivo);
 
-  if (
-    rutaOrigen !== origen &&
-    !rutaOrigen.startsWith(origen + path.sep)
-  ) {
+  if (!dentroDe(origen, rutaOrigen)) {
     throw new Error(`Ruta fuera de lib: ${archivo}`);
   }
 
@@ -27,18 +35,22 @@ function sincronizar(archivo) {
 
   procesados.add(rutaOrigen);
 
-  const contenido = fs.readFileSync(rutaOrigen, "utf8");
+  if (path.extname(rutaOrigen) !== ".js") return;
 
-  // Detectar imports CommonJS generados por TypeScript.
-  const expresion = /require\(["'](\.[^"']+)["']\)/g;
+  const contenido = fs.readFileSync(rutaOrigen, "utf8");
+  const resolver = createRequire(rutaOrigen);
+
+  // Imports estáticos CommonJS.
+  const expresion = /require\(\s*["']([^"']+)["']\s*\)/g;
 
   for (const coincidencia of contenido.matchAll(expresion)) {
     const modulo = coincidencia[1];
 
-    const resolver = createRequire(rutaOrigen);
+    if (!modulo.startsWith(".")) continue;
+
     const dependencia = resolver.resolve(modulo);
 
-    if (!dependencia.startsWith(origen + path.sep)) {
+    if (!dentroDe(origen, dependencia)) {
       throw new Error(
         `Dependencia local fuera de lib: ${modulo}`
       );
@@ -47,27 +59,116 @@ function sincronizar(archivo) {
     pendientes.push(path.relative(origen, dependencia));
   }
 
-  const rutaDestino = path.join(
-    destino,
-    path.relative(origen, rutaOrigen)
-  );
+  // Advertir sobre require() no literales.
+  const expresionDinamica = /require\(\s*(?!["'])[^)]+\)/g;
 
-  fs.mkdirSync(path.dirname(rutaDestino), {
-    recursive: true
-  });
+  for (const coincidencia of contenido.matchAll(expresionDinamica)) {
+    dependenciasDinamicas.push({
+      archivo: path.relative(origen, rutaOrigen),
+      expresion: coincidencia[0]
+    });
+  }
+}
 
-  fs.copyFileSync(rutaOrigen, rutaDestino);
+function listarArchivos(directorio) {
+  if (!fs.existsSync(directorio)) return [];
 
-  console.log(`✔ ${path.relative(origen, rutaOrigen)}`);
+  const archivos = [];
+
+  function recorrerDirectorio(actual) {
+    for (const entrada of fs.readdirSync(actual, {
+      withFileTypes: true
+    })) {
+      const ruta = path.join(actual, entrada.name);
+
+      if (entrada.isDirectory()) {
+        recorrerDirectorio(ruta);
+      } else if (entrada.isFile()) {
+        archivos.push(ruta);
+      }
+    }
+  }
+
+  recorrerDirectorio(directorio);
+  return archivos;
 }
 
 console.log("================================");
 console.log("SINCRONIZACIÓN API CARTERA");
 console.log("================================");
 
-while (pendientes.length > 0) {
-  sincronizar(pendientes.shift());
+for (const archivo of archivosAdicionales) {
+  pendientes.push(archivo);
 }
 
-console.log(`\nArchivos sincronizados: ${procesados.size}`);
-console.log("Sincronización finalizada.");
+// 1. Descubrir todas las dependencias antes de modificar destino.
+while (pendientes.length > 0) {
+  recorrer(pendientes.shift());
+}
+
+// 2. Detectar archivos obsoletos.
+const necesarios = new Set(
+  [...procesados].map(archivo =>
+    path.relative(origen, archivo)
+  )
+);
+
+const obsoletos = listarArchivos(destino)
+  .filter(archivo => [".js", ".json"].includes(path.extname(archivo)))
+  .filter(archivo =>
+    !necesarios.has(path.relative(destino, archivo))
+  );
+
+console.log(`Dependencias necesarias: ${necesarios.size}`);
+
+if (dependenciasDinamicas.length > 0) {
+  console.log("\n⚠ Posibles dependencias dinámicas:");
+
+  for (const item of dependenciasDinamicas) {
+    console.log(`  ${item.archivo}: ${item.expresion}`);
+  }
+
+  if (limpiar) {
+    throw new Error(
+      "Limpieza cancelada: revisar dependencias dinámicas."
+    );
+  }
+}
+
+if (obsoletos.length > 0) {
+  console.log("\nArchivos potencialmente obsoletos:");
+
+  for (const archivo of obsoletos) {
+    console.log(`  ${path.relative(destino, archivo)}`);
+  }
+} else {
+  console.log("No se detectaron archivos obsoletos.");
+}
+
+// 3. Sincronizar archivos necesarios.
+for (const archivo of procesados) {
+  const relativa = path.relative(origen, archivo);
+  const rutaDestino = path.join(destino, relativa);
+
+  fs.mkdirSync(path.dirname(rutaDestino), {
+    recursive: true
+  });
+
+  fs.copyFileSync(archivo, rutaDestino);
+
+  console.log(`✔ ${relativa}`);
+}
+
+// 4. Limpiar únicamente si se solicitó.
+if (limpiar) {
+  for (const archivo of obsoletos) {
+    fs.unlinkSync(archivo);
+    console.log(`🗑 Eliminado: ${path.relative(destino, archivo)}`);
+  }
+} else if (obsoletos.length > 0) {
+  console.log(
+    "\nPara eliminar los archivos obsoletos, usar --clean."
+  );
+}
+
+console.log("\nSincronización finalizada.");

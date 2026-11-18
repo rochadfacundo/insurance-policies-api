@@ -2,6 +2,11 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.esPASValido = void 0;
 const ESTADOS_PAS = ["ACTIVO", "BAJA", "PENDIENTE"];
+const TIPOS_GESTION = [
+    "EJECUTIVA_ASIGNADA",
+    "AUTOGESTIONADO",
+    "SIN_ASIGNAR"
+];
 const ESTADOS_RC = [
     "VIGENTE",
     "NO_TIENE",
@@ -70,6 +75,8 @@ const esPASValido = (valor) => {
             valor["tieneRC"] === null) &&
         ESTADOS_RC.includes(valor["estadoRC"]) &&
         esTextoOpcional(valor["ejecutivaId"]) &&
+        (valor["tipoGestion"] === undefined ||
+            TIPOS_GESTION.includes(valor["tipoGestion"])) &&
         esContactoValido(valor["contacto"]) &&
         Array.isArray(valor["companias"]) &&
         valor["companias"].every(esCodigoAseguradoraValido) &&

@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.FirestorePASRepository = void 0;
 const firestore_1 = require("firebase-admin/firestore");
+const pasValidator_1 = require("../validators/pasValidator");
 class FirestorePASRepository {
     firestore;
     COLLECTION_NAME = "productores";
@@ -20,16 +21,22 @@ class FirestorePASRepository {
     }
     /**
      * Obtiene un PAS por su identificador.
+     * Valida la estructura del documento recuperado de Firestore.
      */
     async obtenerPorId(id) {
         const doc = await this.firestore.collection(this.COLLECTION_NAME).doc(id).get();
         if (!doc.exists) {
             return null;
         }
-        return {
+        const datos = {
             ...doc.data(),
             id: doc.id
         };
+        if (!(0, pasValidator_1.esPASValido)(datos)) {
+            console.error(`Estructura inválida para el productor: ${doc.id}`);
+            throw new Error("El documento del productor contiene datos inválidos");
+        }
+        return datos;
     }
     /**
      * Busca PAS por matrícula.

@@ -1,6 +1,7 @@
 
 import { Firestore, Timestamp } from "firebase-admin/firestore";
 import { PAS } from "../models/pas";
+import { esPASValido } from "../validators/pasValidator";
 
 export class FirestorePASRepository {
 
@@ -23,6 +24,7 @@ export class FirestorePASRepository {
 
     /**
      * Obtiene un PAS por su identificador.
+     * Valida la estructura del documento recuperado de Firestore.
      */
     async obtenerPorId(id: string): Promise<PAS | null> {
 
@@ -32,10 +34,18 @@ export class FirestorePASRepository {
             return null;
         }
 
-        return {
+        const datos: unknown = {
             ...doc.data(),
             id: doc.id
-        } as PAS;
+        };
+
+        if (!esPASValido(datos)) {
+            console.error(`Estructura inválida para el productor: ${doc.id}`);
+
+            throw new Error("El documento del productor contiene datos inválidos");
+        }
+
+        return datos;
     }
 
     /**

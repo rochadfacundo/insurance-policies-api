@@ -557,54 +557,56 @@ export class FirestorePolizaRepository {
      * @param fechaDesde Inicio del período.
      * @param fechaHasta Fin del período.
      * @returns Pólizas con próxima gestión dentro del período.
-     */
-    async obtenerProximasAGestionar(fechaDesde: Date, fechaHasta: Date): Promise<Poliza[]> {
+     */   
+        async obtenerProximasAGestionar(
+            fechaDesde: Date,
+            fechaHasta: Date
+        ): Promise<Poliza[]> {
 
-        const desde = Timestamp.fromDate(fechaDesde);
-        const hasta = Timestamp.fromDate(fechaHasta);
+            const desde = Timestamp.fromDate(fechaDesde);
+            const hasta = Timestamp.fromDate(fechaHasta);
 
-        const coleccion = this.firestore.collection(this.COLLECTION_NAME);
+            const coleccion = this.firestore.collection(this.COLLECTION_NAME);
 
-        /*
-        * Consultamos las fechas que utiliza el frontend
-        * para representar la próxima gestión.
-        */
-        const [facturaciones, gestionesFedPat] = await Promise.all([
+            const [facturaciones, gestionesFedPat] = await Promise.all([
+                coleccion
+                    .where("facturacion.hasta", ">=", desde)
+                    .where("facturacion.hasta", "<=", hasta)
+                    .get(),
 
-            coleccion
-                .where("facturacion.hasta", ">=", desde)
-                .where("facturacion.hasta", "<=", hasta)
-                .get(),
+                coleccion
+                    .where("fechaProximaGestion", ">=", desde)
+                    .where("fechaProximaGestion", "<=", hasta)
+                    .get()
+            ]);
 
-            coleccion
-                .where("fechaProximaGestion", ">=", desde)
-                .where("fechaProximaGestion", "<=", hasta)
-                .get()
-        ]);
+            // AUDITORÍA
+            console.log("\n========== AUDITORÍA FIRESTORE ==========");
+            console.log(`Pólizas por facturación: ${facturaciones.size}`);
+            console.log(`Pólizas por próxima gestión: ${gestionesFedPat.size}`);
 
-        /*
-        * Unificamos los resultados sin repetir pólizas.
-        */
-        const documentos = new Map<
-            string,
-            FirebaseFirestore.QueryDocumentSnapshot
-        >();
+            // Unificamos resultados sin duplicados.
+            const documentos = new Map<
+                string,
+                FirebaseFirestore.QueryDocumentSnapshot
+            >();
 
-        for (const documento of facturaciones.docs) {
-            documentos.set(documento.id, documento);
+            for (const documento of facturaciones.docs) {
+                documentos.set(documento.id, documento);
+            }
+
+            for (const documento of gestionesFedPat.docs) {
+                documentos.set(documento.id, documento);
+            }
+
+            console.log(`Pólizas únicas recuperadas: ${documentos.size}`);
+            console.log("========================================\n");
+
+            return [...documentos.values()].map(documento =>
+                this.mapearDocumento(documento.id, documento.data())
+            );
         }
 
-        for (const documento of gestionesFedPat.docs) {
-            documentos.set(documento.id, documento);
-        }
-
-        /*
-        * Convertimos los documentos al modelo Poliza.
-        */
-        return [...documentos.values()].map(documento =>
-            this.mapearDocumento(documento.id, documento.data())
-        );
-    }
 
 
 

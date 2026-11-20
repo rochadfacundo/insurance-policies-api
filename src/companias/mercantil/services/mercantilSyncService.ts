@@ -33,9 +33,14 @@ export class MercantilSyncService {
      * @see MercantilCarteraService
      * @see Productor
      */
-    async sincronizar(productor: Productor): Promise<Poliza[]> {
+    async sincronizar(
+        productor: Productor,
+        guardarErrores: boolean = true
+    ): Promise<Poliza[]> {
 
       const resultado: Poliza[] = [];
+
+      let polizasConError = 0;
   
       const cartera = await this.mercantilService.obtenerCarteraCompleta(productor.codigo);
   
@@ -60,11 +65,12 @@ export class MercantilSyncService {
                       endosoMercantil
                   );
 
-              const detalleFacturacion =
-                  await this.mercantilService.obtenerUltimaFacturacion(
-                      poliMercantil,
-                      endosoMercantil
-                  );
+                  const { detalleFacturacion, periodicidadFacturacion } =
+                        await this.mercantilService.analizarFacturacion(
+                            poliMercantil,
+                            endosoMercantil,
+                            detalleActual
+                        );
 
               const poliza =
                   MercantilPolizaMapper.mapear(
@@ -74,6 +80,9 @@ export class MercantilSyncService {
                       productor,
                       bienes
                   );
+
+                
+               poliza.periodicidadFacturacion = periodicidadFacturacion;
   
   
               /**
@@ -95,6 +104,7 @@ export class MercantilSyncService {
   
   
           } catch (error) {
+            polizasConError++;
   
               const mensaje =
                   error instanceof Error
@@ -115,50 +125,60 @@ export class MercantilSyncService {
   
               console.warn(mensaje);
   
+              if (guardarErrores) {
+                try {
   
-              try {
-  
-                  const idError =
-                      await this.errorRepository.guardar({
-  
-                          compania:
-                              ECompania.MERCANTIL_ANDINA,
-  
-                          productor,
-  
-                          poliza:
-                              polizaMercantil.poliza,
-  
-                          endoso:
-                              polizaMercantil.endoso,
-  
-                          servicio:
-                              "sincronizacion-poliza",
-  
-                          mensaje,
-  
-                          detalle
-                      });
-  
-  
-                  console.log(
-                      `Error guardado en Firestore ` +
-                      `con ID: ${idError}`
-                  );
-  
-  
-              } catch (errorFirestore) {
-  
-                  console.error(
-                      "No se pudo guardar el error en Firestore:"
-                  );
-  
-                  console.error(errorFirestore);
-              }
+                    const idError =
+                        await this.errorRepository.guardar({
+    
+                            compania:
+                                ECompania.MERCANTIL_ANDINA,
+    
+                            productor,
+    
+                            poliza:
+                                polizaMercantil.poliza,
+    
+                            endoso:
+                                polizaMercantil.endoso,
+    
+                            servicio:
+                                "sincronizacion-poliza",
+    
+                            mensaje,
+    
+                            detalle
+                        });
+    
+    
+                    console.log(
+                        `Error guardado en Firestore ` +
+                        `con ID: ${idError}`
+                    );
+    
+    
+                } catch (errorFirestore) {
+    
+                    console.error(
+                        "No se pudo guardar el error en Firestore:"
+                    );
+    
+                    console.error(errorFirestore);
+                }
+            }
+           
           }
       }
   
-  
-      return resultado;
+      if (polizasConError > 0) {
+        throw new Error(
+            `[MERCANTIL] Sincronización incompleta del productor ` +
+            `${productor.codigo}. ` +
+            `${polizasConError} pólizas no pudieron procesarse. ` +
+            `No se debe actualizar su cartera en Firestore.`
+            );
+        }
+        
+        return resultado;
   }
 }

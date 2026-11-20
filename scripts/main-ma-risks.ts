@@ -1,32 +1,69 @@
-import axios from "axios";
 
-import {obtenerProductoresMercantil} from "../src/companias/mercantil/models/productoresMercantil";
-import {MercantilSyncService} from "../src/companias/mercantil/services/mercantilSyncService";
-import {FirestorePolizaRepository} from "../src/repositories/firestorePolizaRepository";
-import {FirestoreErrorRepository} from "../src/repositories/firebaseErrorRepository";
-import {ECompania} from "../src/models/eCompania";
+import dotenv from "dotenv";
+import path from "path";
 
-import {ErrorSincronizacion} from "../src/models/errorSincronizacion";
+// ======================================================
+// 1. CONFIGURACIÓN DE ENTORNO
+// ======================================================
+
+dotenv.config({
+    path: path.resolve(__dirname, "../.env.scripts.backup")
+});
+
+process.env.GOOGLE_APPLICATION_CREDENTIALS = path.resolve(
+    __dirname,
+    "../src/credentials/firebase-admin.json"
+);
+
+// ======================================================
+// 2. IMPORTACIONES
+// ======================================================
+
+import { obtenerProductoresMercantil } from "../src/companias/mercantil/models/productoresMercantil";
+import { MercantilSyncService } from "../src/companias/mercantil/services/mercantilSyncService";
+
+import { FirestorePolizaRepository } from "../src/repositories/firestorePolizaRepository";
+import { FirestoreErrorRepository } from "../src/repositories/firebaseErrorRepository";
+
+import { ECompania } from "../src/models/eCompania";
+import { ErrorSincronizacion } from "../src/models/errorSincronizacion";
 import { ErrorProductor } from "../src/models/errorProductor";
 import { ResumenGeneral } from "../src/models/sync";
+
 import { formatearDuracion } from "../src/utils/utils";
-import { mostrarResumen, normalizarError, obtenerMensajeError } from "../src/utils/syncUtils";
+
+import {
+    mostrarResumen,
+    normalizarError,
+    obtenerMensajeError
+} from "../src/utils/syncUtils";
+
+// ======================================================
+// 3. PROCESO PRINCIPAL
+// ======================================================
 
 async function main(): Promise<void> {
 
     const inicioGeneral = Date.now();
 
+    // --------------------------------------------------
+    // 3.1. Inicialización de servicios y repositorios
+    // --------------------------------------------------
+
     const syncService = new MercantilSyncService();
     const polizaRepository = new FirestorePolizaRepository();
     const errorRepository = new FirestoreErrorRepository();
 
-    /*
-     * Procesamos solamente productores activos.
-        * Para pruebas, se puede filtrar por código de productor.
-    */
-    const productores = obtenerProductoresMercantil().filter(productor => productor.estado_id === 1);
-  
+    // --------------------------------------------------
+    // 3.2. Productores activos
+    // --------------------------------------------------
 
+    const productores = obtenerProductoresMercantil()
+        .filter(productor => productor.estado_id === 1);
+
+    // --------------------------------------------------
+    // 3.3. Contadores y errores
+    // --------------------------------------------------
 
     const erroresProductores: ErrorProductor[] = [];
 
@@ -39,25 +76,24 @@ async function main(): Promise<void> {
     let totalRiesgosActualizados = 0;
     let totalRiesgosEliminados = 0;
 
+    // --------------------------------------------------
+    // 3.4. Encabezado
+    // --------------------------------------------------
+
     console.log("");
     console.log("==================================================");
     console.log("SINCRONIZACIÓN GENERAL - MERCANTIL ANDINA");
     console.log("==================================================");
     console.log(`Productores a procesar: ${productores.length}`);
     console.log("");
-    console.log("La sincronización recalculará los riesgos de cada productor, ");
-    console.log("");
 
-    for (let indice = 0; indice < productores.length; indice++) {
+    // ==================================================
+    // 4. SINCRONIZACIÓN POR PRODUCTOR
+    // ==================================================
 
-        const productor = productores[indice];
+    for (const [indice, productor] of productores.entries()) {
 
         const inicioProductor = Date.now();
-
-        
-        if (productor == null) {
-            continue;
-        }
 
         console.log("");
         console.log("--------------------------------------------------");
@@ -69,38 +105,44 @@ async function main(): Promise<void> {
 
         try {
 
+            // ------------------------------------------
+            // 4.1. Consultar Mercantil y detectar riesgos
+            // ------------------------------------------
+
             console.log("Obteniendo cartera y recalculando riesgos...");
 
-            /*
-             * sincronizar() consulta:
-             *
-             * cartera
-             * → detalle
-             * → bienes
-             * → mapper
-             * → RiskEngine
-             *
-             * Devuelve únicamente los riesgos actuales.
-             */
-            const riesgosActuales = await syncService.sincronizar(productor);
+            const riesgosActuales = await syncService.sincronizar(
+                productor
+            );
 
-            console.log(`Riesgos actuales válidos: ${riesgosActuales.length}`);
+            console.log(
+                `Riesgos actuales válidos: ${riesgosActuales.length}`
+            );
 
-            const resultado = await polizaRepository.sincronizarRiesgosProductor(productor, ECompania.MERCANTIL_ANDINA, riesgosActuales);
+            // ------------------------------------------
+            // 4.2. Sincronizar riesgos en Firestore
+            // ------------------------------------------
 
             /*
-             * Compara:
+             * Compara los riesgos obtenidos de Mercantil
+             * con los almacenados en Firestore.
              *
-             * riesgos actuales obtenidos de Mercantil
-             * vs.
-             * riesgos guardados en Firestore
-             *
-             * - inserta nuevos;
-             * - actualiza existentes;
-             * - archiva los desaparecidos;
-             * - elimina los desaparecidos de "polizas".
+             * - Inserta nuevos riesgos.
+             * - Actualiza los existentes.
+             * - Archiva los que desaparecieron.
+             * - Elimina de "polizas" los desaparecidos.
              */
-            //const resultado = await polizaRepository.sincronizarRiesgosProductor(productor,ECompania.MERCANTIL_ANDINA,riesgosActuales);
+
+            const resultado =
+                await polizaRepository.sincronizarRiesgosProductor(
+                    productor,
+                    ECompania.MERCANTIL_ANDINA,
+                    riesgosActuales
+                );
+
+            // ------------------------------------------
+            // 4.3. Acumular resultados
+            // ------------------------------------------
 
             productoresExitosos++;
 
@@ -117,6 +159,10 @@ async function main(): Promise<void> {
             console.log(`  Riesgos eliminados: ${resultado.riesgosEliminados}`);
 
         } catch (error: unknown) {
+
+            // ------------------------------------------
+            // 4.4. Registrar error del productor
+            // ------------------------------------------
 
             productoresConError++;
 
@@ -142,10 +188,13 @@ async function main(): Promise<void> {
             console.error(`Error procesando productor ${productor.codigo}:`);
             console.error(errorNormalizado.mensaje);
 
+            // ------------------------------------------
+            // 4.5. Guardar error en Firestore
+            // ------------------------------------------
+
             try {
 
                 const errorFirestore: ErrorSincronizacion = {
-
                     compania: ECompania.MERCANTIL_ANDINA,
 
                     productor: {
@@ -156,13 +205,11 @@ async function main(): Promise<void> {
 
                     servicio: "sincronizacion-general-riesgos",
 
-                    mensaje: errorNormalizado.mensaje,
-
+                    mensaje: errorNormalizado.mensaje
                 };
 
                 if (errorNormalizado.detalle !== undefined) {
-                    errorFirestore.detalle =
-                        errorNormalizado.detalle;
+                    errorFirestore.detalle = errorNormalizado.detalle;
                 }
 
                 await errorRepository.guardar(errorFirestore);
@@ -171,40 +218,61 @@ async function main(): Promise<void> {
 
             } catch (errorGuardandoFirestore: unknown) {
 
-                console.error("No se pudo guardar el error en Firestore:");
+                console.error(
+                    "No se pudo guardar el error en Firestore:"
+                );
 
-                console.error(obtenerMensajeError(errorGuardandoFirestore));
+                console.error(
+                    obtenerMensajeError(errorGuardandoFirestore)
+                );
             }
 
         } finally {
 
+            // ------------------------------------------
+            // 4.6. Estadísticas del productor
+            // ------------------------------------------
+
             productoresProcesados++;
 
-            console.log(`Tiempo productor: ${formatearDuracion(Date.now() - inicioProductor)}`);
+            console.log(
+                `Tiempo productor: ${formatearDuracion(
+                    Date.now() - inicioProductor
+                )}`
+            );
         }
     }
+
+    // ==================================================
+    // 5. RESUMEN GENERAL
+    // ==================================================
 
     const resumen: ResumenGeneral = {
         productoresTotales: productores.length,
         productoresProcesados,
         productoresExitosos,
         productoresConError,
+
         riesgosActuales: totalRiesgosActuales,
         riesgosNuevos: totalRiesgosNuevos,
         riesgosActualizados: totalRiesgosActualizados,
         riesgosEliminados: totalRiesgosEliminados,
-        duracionTotal: formatearDuracion(Date.now() - inicioGeneral)
+
+        duracionTotal: formatearDuracion(
+            Date.now() - inicioGeneral
+        )
     };
 
-    mostrarResumen(resumen,erroresProductores);
+    mostrarResumen(resumen, erroresProductores);
 
     if (productoresConError > 0) {
         process.exitCode = 1;
     }
 }
 
-
-
+// ======================================================
+// 6. EJECUCIÓN Y CONTROL DE ERRORES FATALES
+// ======================================================
 
 main()
     .then(() => {
@@ -213,14 +281,14 @@ main()
         console.log("Proceso general finalizado.");
 
     })
-    .catch(
-        (error: unknown) => {
+    .catch((error: unknown) => {
 
-            console.error("");
-            console.error("El proceso general finalizó con un error fatal.");
+        console.error("");
+        console.error(
+            "El proceso general finalizó con un error fatal."
+        );
 
-            console.error(obtenerMensajeError(error));
+        console.error(obtenerMensajeError(error));
 
-            process.exitCode = 1;
-        }
-    );
+        process.exitCode = 1;
+    });

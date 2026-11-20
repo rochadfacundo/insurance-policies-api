@@ -206,6 +206,19 @@ export class MercantilDetallePolizaManager {
         return this.detalle.rama.id;
     }
 
+
+    /**
+     * Devuelve el período informado por Mercantil
+     * para el movimiento de la póliza.
+     */
+    getPeriodo(): { desde: Date; hasta: Date } {
+        return {
+            desde: new Date(this.detalle.desde),
+            hasta: new Date(this.detalle.hasta)
+        };
+    }
+
+
     /**
      * Calcula el factor necesario para anualizar los importes
      * correspondientes al período de facturación del detalle.

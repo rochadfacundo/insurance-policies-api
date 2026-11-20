@@ -48,6 +48,44 @@ export class RenovacionesService {
     //Si no hay productor asociado lo enviamos a Mica
     private readonly EJECUTIVA_DEFAULT_ID = "micaela-rocha";
 
+    private polizasExcluidas: {
+        poliza: Poliza;
+        motivo: string;
+    }[] = [];
+    
+    public obtenerPolizasExcluidas(): {
+        poliza: Poliza;
+        motivo: string;
+    }[] {
+        return [...this.polizasExcluidas];
+    }
+
+    /**
+ * Exclusión temporal para el reporte de diciembre de 2026.
+ * Pólizas Mercantil con períodos mensuales detectados en la auditoría.
+ *
+ * IMPORTANTE: reemplazar por detección automática de periodicidad.
+ */
+private readonly POLIZAS_MERCANTIL_MENSUALES = new Set([
+    516739464,
+    516889532,
+    516863085,
+    516890062,
+    517370668,
+    516950802,
+    516556190,
+    517157666,
+    517372421,
+    516735589,
+    516800324,
+    517188303,
+    516810315,
+    171969982,
+    517176710,
+    517261449,
+    517356083
+]);
+
     /**
      * Repository utilizado para consultar las pólizas
      * almacenadas en Firestore.
@@ -101,6 +139,9 @@ export class RenovacionesService {
         // Obtenemos las pólizas candidatas según ambas fechas.
         const polizas = await this.polizaRepository.obtenerProximasAGestionar(desde,hasta);
 
+
+        this.polizasExcluidas = [];
+
         /*
         * Conservamos únicamente las pólizas con riesgos detectados
         * y cuya próxima gestión corresponde al mes solicitado.
@@ -110,14 +151,72 @@ export class RenovacionesService {
         */
         return polizas.filter(poliza => {
 
-            // El frontend de riesgos solamente muestra pólizas con riesgos.
             if (!Array.isArray(poliza.riesgos) || poliza.riesgos.length === 0) {
                 return false;
             }
-
+        
             const fechaGestion = this.obtenerFechaProximaGestion(poliza);
+        
+            if (
+                fechaGestion === null ||
+                fechaGestion < desde ||
+                fechaGestion > hasta
+            ) {
+                return false;
+            }
+        
+            // Exclusión temporal de facturaciones mensuales de Mercantil.
+            if (
+                poliza.compania === ECompania.MERCANTIL_ANDINA &&
+                this.POLIZAS_MERCANTIL_MENSUALES.has(
+                    Number(poliza.detallePoliza.numeroPoliza)
+                )
+            ) {
 
-            return fechaGestion !== null && fechaGestion >= desde && fechaGestion <= hasta;
+                this.polizasExcluidas.push({
+                    poliza,
+                    motivo: "Facturación mensual Mercantil Andina - exclusión temporal"
+                });
+                console.log(
+                    `[RENOVACIONES] Excluida Mercantil mensual: ${poliza.detallePoliza.numeroPoliza}`
+                );
+        
+                return false;
+            }
+        
+// Excluir refacturación mensual de Federación Patronal.
+if (
+    poliza.compania === ECompania.FEDERACION_PATRONAL &&
+    poliza.tipoProximaGestion === "REFACTURACION" &&
+    poliza.facturacion?.desde &&
+    poliza.facturacion?.hasta
+) {
+    const desdeFacturacion = poliza.facturacion.desde;
+    const hastaFacturacion = poliza.facturacion.hasta;
+
+    const unMesDespues = new Date(desdeFacturacion);
+    unMesDespues.setMonth(unMesDespues.getMonth() + 1);
+
+    if (
+        unMesDespues.getFullYear() === hastaFacturacion.getFullYear() &&
+        unMesDespues.getMonth() === hastaFacturacion.getMonth() &&
+        unMesDespues.getDate() === hastaFacturacion.getDate()
+    ) {
+        this.polizasExcluidas.push({
+            poliza,
+            motivo: "Refacturación mensual Federación Patronal"
+        });
+    
+        console.log(
+            `[RENOVACIONES] Excluida Federación mensual: ${poliza.detallePoliza.numeroPoliza}`
+        );
+    
+        return false;
+    }
+}
+
+
+            return true;
         });
     }
 

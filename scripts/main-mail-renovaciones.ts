@@ -20,12 +20,20 @@ import {
     Poliza
 } from "../src/models/poliza";
 import { DateUtils } from "../src/utils/dateUtils";
+import path from "path";
 
+import ExcelJS from "exceljs";
 
 dotenv.config({
-    path: "../.env"
+    path: "../.env.scripts.backup"
 });
 
+process.env.GOOGLE_APPLICATION_CREDENTIALS = path.resolve(
+    __dirname,
+    "../src/credentials/firebase-admin.json"
+);
+
+import fs from "fs";
 
 /*
  * ============================================================
@@ -43,8 +51,9 @@ dotenv.config({
  * 20/12/2026 → vencimientos de enero de 2027.
  */
 
-//const FECHA_REFERENCIA = new Date();
-const FECHA_REFERENCIA = new Date(2026, 9, 20);
+// Simulamos el envío del 20 de noviembre de 2026.
+// Buscamos pólizas con próxima gestión en diciembre.
+const FECHA_REFERENCIA = new Date(2026, 10, 20);
 
 /*
  * IMPORTANTE:
@@ -64,7 +73,7 @@ const EMAIL_PRUEBA =
  * false:
  * cada correo se envía al email real de la ejecutiva.
  */
-const MODO_PRUEBA = false;
+const MODO_PRUEBA = true;
 
 
 /*
@@ -185,11 +194,9 @@ function ordenarPorProximaGestion(
 async function main(): Promise<void> {
 
     console.log("");
-    console.log("==================================================");
-    console.log("PRUEBA ENVÍO RENOVACIONES NOVIEMBRE 2026");
-    console.log("Fecha simulada:     20/10/2026");
-    console.log("Período:            01/11/2026 - 30/11/2026");
-    console.log("==================================================");
+    console.log("PRUEBA ENVÍO RENOVACIONES DICIEMBRE 2026");
+    console.log("Fecha simulada:     20/11/2026");
+    console.log("Período:            01/12/2026 - 31/12/2026");
     //console.log(`Email de prueba:    ${EMAIL_PRUEBA}`);
 
     console.log(
@@ -213,7 +220,6 @@ async function main(): Promise<void> {
 
     const excelRenovacionesService = new ExcelRenovacionesService();
 
-    const emailService = new EmailService();
 
 
     /*
@@ -226,6 +232,75 @@ async function main(): Promise<void> {
      */
 
     const renovaciones: RenovacionesEjecutiva[] = await renovacionesService.obtenerRenovacionesPorEjecutiva(FECHA_REFERENCIA);
+
+
+
+const excluidas = renovacionesService.obtenerPolizasExcluidas();
+
+console.log("\n========== EXCLUIDAS REGISTRADAS ==========");
+
+for (const { poliza, motivo } of excluidas) {
+    console.log(
+        `${poliza.compania} | ${poliza.detallePoliza.numeroPoliza} | ${motivo}`
+    );
+}
+
+console.log(`TOTAL: ${excluidas.length}`);
+console.log("==========================================\n");
+
+const workbook = new ExcelJS.Workbook();
+const worksheet = workbook.addWorksheet("Pólizas excluidas");
+
+worksheet.columns = [
+    { header: "Compañía", key: "compania", width: 25 },
+    { header: "Código PAS", key: "codigoPAS", width: 15 },
+    { header: "Productor", key: "productor", width: 35 },
+    { header: "Póliza", key: "poliza", width: 20 },
+    { header: "Asegurado", key: "asegurado", width: 45 },
+    { header: "Inicio facturación", key: "desde", width: 22 },
+    { header: "Fin facturación", key: "hasta", width: 22 },
+    { header: "Fin vigencia", key: "vigencia", width: 22 },
+    { header: "Motivo exclusión", key: "motivo", width: 55 }
+];
+
+for (const { poliza, motivo } of excluidas) {
+    worksheet.addRow({
+        compania: poliza.compania,
+        codigoPAS: poliza.productor.codigo,
+        productor: poliza.productor.nombre,
+        poliza: poliza.detallePoliza.numeroPoliza,
+        asegurado: poliza.cliente.nombre,
+        desde: poliza.facturacion?.desde
+            ? formatearFecha(poliza.facturacion.desde)
+            : "",
+        hasta: poliza.facturacion?.hasta
+            ? formatearFecha(poliza.facturacion.hasta)
+            : "",
+        vigencia: poliza.vigencia?.hasta
+            ? formatearFecha(poliza.vigencia.hasta)
+            : "",
+        motivo
+    });
+}
+
+worksheet.getRow(1).font = { bold: true };
+
+const carpetaAuditoria = path.resolve(
+    __dirname,
+    "../reportes-renovaciones"
+);
+
+fs.mkdirSync(carpetaAuditoria, { recursive: true });
+
+const rutaAuditoria = path.join(
+    carpetaAuditoria,
+    "renovaciones-excluidas-diciembre-2026.xlsx"
+);
+
+await workbook.xlsx.writeFile(rutaAuditoria);
+
+console.log(`\nExcel de excluidas generado: ${rutaAuditoria}`);
+console.log(`Total excluidas: ${excluidas.length}`);
 
     /*
     * Proximo mes a renovar
@@ -341,14 +416,44 @@ async function main(): Promise<void> {
 
     if (!ENVIAR_EMAIL) {
 
-        console.log("");
-        console.log("⚠ ENVIAR_EMAIL = false");
-        console.log("No se envió ningún correo.");
-
+        const carpetaSalida = path.resolve(
+            __dirname,
+            "../reportes-renovaciones"
+        );
+    
+        fs.mkdirSync(carpetaSalida, { recursive: true });
+    
+        for (const grupo of renovaciones) {
+    
+            const polizas = ordenarPorProximaGestion(
+                grupo.polizas,
+                renovacionesService
+            );
+    
+            const excel = await excelRenovacionesService.generarExcel(polizas);
+    
+            const mesArchivo = mesRenovacion
+                .toLowerCase()
+                .replace(/\s+/g, "-");
+    
+            const nombreArchivo =
+                `renovaciones-${mesArchivo}-${grupo.ejecutiva.id}.xlsx`;
+    
+            const rutaArchivo = path.join(carpetaSalida, nombreArchivo);
+    
+            fs.writeFileSync(rutaArchivo, excel);
+    
+            console.log(`Excel generado: ${rutaArchivo}`);
+        }
+    
+        console.log("\nNo se envió ningún correo.");
+    
         return;
     }
 
 
+    // Solo inicializamos el servicio cuando realmente vamos a enviar.
+    const emailService = new EmailService();
     /*
      * ========================================================
      * ENVÍO DE CORREOS

@@ -3,6 +3,7 @@ import { DetallePoliza } from "./detallePoliza";
 import { ECompania } from "./eCompania";
 import { EstadoRefacturacion } from "./estadoRefacturacion";
 import { Facturacion } from "./facturacion";
+import { PeriodicidadFacturacion } from "./periodicidadFacturacion";
 import { Productor, ProductorBase } from "./productor";
 import { Riesgo } from "./riesgo";
 import { TipoProximaGestion } from "./tipoProximaGestion";
@@ -31,6 +32,16 @@ export interface Poliza {
 
   // Fechas
   facturacion: Facturacion;
+
+  /**
+   * Periodicidad de facturación identificada a partir
+   * de los movimientos informados por la compañía.
+   *
+   * MENSUAL: se confirmó facturación mensual recurrente.
+   * NO_MENSUAL: se identificó un período no mensual.
+   * INDETERMINADA: no existe evidencia suficiente.
+   */
+  periodicidadFacturacion?: PeriodicidadFacturacion;
 
   /**
    * Próxima fecha de refacturación cuando pudo determinarse

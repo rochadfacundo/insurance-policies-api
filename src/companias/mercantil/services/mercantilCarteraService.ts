@@ -8,6 +8,7 @@ import { obtenerDetallePoliza } from "./mercantilDetallePolizaService";
 import axios from "axios";
 import { obtenerPolizasVigentes } from "./mercantilPolizasService";
 import { esErrorSql0305 } from "../../../utils/utils";
+import { PeriodicidadFacturacion } from "../../../models/periodicidadFacturacion";
 
 /**
  * Servicio encargado de reconstruir
@@ -161,6 +162,244 @@ export class MercantilCarteraService {
 
         return Array.from(map.values());
     }
+
+    /**
+     * Determina la periodicidad de facturación de una póliza
+     * analizando sus movimientos históricos.
+     *
+     * Para confirmar periodicidad mensual se requieren
+     * dos períodos mensuales consecutivos.
+     *
+     * No modifica información ni escribe en Firestore.
+     */
+    async obtenerPeriodicidadFacturacion(
+        poliza: number,
+        endosoActual: number
+    ): Promise<PeriodicidadFacturacion> {
+
+        const facturaciones: MercantilDetallePolizaManager[] = [];
+
+        let consultasIncompletas = false;
+
+        for (let endoso = endosoActual; endoso >= 0; endoso--) {
+
+            try {
+                const detalle = await this.obtenerDetallePoliza(
+                    poliza,
+                    endoso
+                );
+
+                const tipo = detalle.getTipo()?.trim().toUpperCase();
+
+                if (tipo === "FACTURACION") {
+                    facturaciones.push(detalle);
+                }
+
+                // Solo necesitamos las dos últimas facturaciones.
+                if (facturaciones.length === 2) {
+                    break;
+                }
+
+            } catch (error) {
+                consultasIncompletas = true;
+
+                console.warn(
+                    `No se pudo consultar el endoso ${endoso} ` +
+                    `de la póliza ${poliza} al analizar periodicidad.`
+                );
+            }
+        }
+
+        if (consultasIncompletas) {
+            return PeriodicidadFacturacion.INDETERMINADA;
+        }
+        
+        const ultima = facturaciones[0];
+        const anterior = facturaciones[1];
+        
+        if (!ultima) {
+            return PeriodicidadFacturacion.INDETERMINADA;
+        }
+        
+        const periodoUltimo = ultima.getPeriodo();
+
+        if (!this.esPeriodoMensual(
+            periodoUltimo.desde,
+            periodoUltimo.hasta
+        )) {
+            return PeriodicidadFacturacion.NO_MENSUAL;
+        }
+
+        if (!anterior) {
+            return PeriodicidadFacturacion.INDETERMINADA;
+        }
+
+        const periodoAnterior = anterior.getPeriodo();
+
+        const anteriorMensual = this.esPeriodoMensual(
+            periodoAnterior.desde,
+            periodoAnterior.hasta
+        );
+
+        const consecutivas =
+            periodoAnterior.hasta.getTime() ===
+            periodoUltimo.desde.getTime();
+
+        if (anteriorMensual && consecutivas) {
+            return PeriodicidadFacturacion.MENSUAL;
+        }
+
+        return PeriodicidadFacturacion.INDETERMINADA;
+    }
+
+    /**
+     * Comprueba si un período representa un mes calendario.
+     * Contempla meses de distinta duración.
+     */
+    private esPeriodoMensual(desde: Date, hasta: Date): boolean {
+
+        if (
+            Number.isNaN(desde.getTime()) ||
+            Number.isNaN(hasta.getTime()) ||
+            hasta <= desde
+        ) {
+            return false;
+        }
+
+        const siguienteMes = new Date(desde);
+
+        const diaOriginal = siguienteMes.getUTCDate();
+
+        siguienteMes.setUTCDate(1);
+        siguienteMes.setUTCMonth(siguienteMes.getUTCMonth() + 1);
+
+        const ultimoDiaMes = new Date(Date.UTC(
+            siguienteMes.getUTCFullYear(),
+            siguienteMes.getUTCMonth() + 1,
+            0
+        )).getUTCDate();
+
+        siguienteMes.setUTCDate(
+            Math.min(diaOriginal, ultimoDiaMes)
+        );
+
+        return siguienteMes.getTime() === hasta.getTime();
+    }
+
+
+
+
+    /**
+     * Obtiene el último detalle económico y determina
+     * la periodicidad de facturación en un solo recorrido.
+     *
+     * No realiza escrituras en Firestore.
+     */
+    async analizarFacturacion(
+        poliza: number,
+        endosoActual: number,
+        detalleActual?: MercantilDetallePolizaManager
+    ): Promise<{
+        detalleFacturacion: MercantilDetallePolizaManager;
+        periodicidadFacturacion: PeriodicidadFacturacion;
+    }> {
+
+        const facturaciones: MercantilDetallePolizaManager[] = [];
+
+        let detalleEndosoCero: MercantilDetallePolizaManager | null = null;
+        let consultasIncompletas = false;
+
+        for (let endoso = endosoActual; endoso >= 0; endoso--) {
+
+            try {
+                const detalle =  endoso === endosoActual && detalleActual
+            ? detalleActual
+            : await this.obtenerDetallePoliza(poliza, endoso);
+
+                const tipo = detalle.getTipo()?.trim().toUpperCase();
+
+                if (tipo === "FACTURACION") {
+                    facturaciones.push(detalle);
+
+                    if (facturaciones.length === 2) {
+                        break;
+                    }
+                }
+
+                if (endoso === 0) {
+                    detalleEndosoCero = detalle;
+                }
+
+            } catch (error) {
+                consultasIncompletas = true;
+
+                console.warn(
+                    `No se pudo consultar el endoso ${endoso} ` +
+                    `de la póliza ${poliza} al analizar facturación.`
+                );
+            }
+        }
+
+        const ultimaFacturacion = facturaciones[0];
+
+        const detalleFacturacion =
+            ultimaFacturacion ?? detalleEndosoCero;
+
+        if (!detalleFacturacion) {
+            throw new Error(
+                `No se encontró una facturación ni un endoso 0 válido ` +
+                `para la póliza ${poliza}.`
+            );
+        }
+
+        let periodicidadFacturacion =
+            PeriodicidadFacturacion.INDETERMINADA;
+
+        if (!consultasIncompletas && ultimaFacturacion) {
+
+            const periodoUltimo = ultimaFacturacion.getPeriodo();
+
+            if (!this.esPeriodoMensual(
+                periodoUltimo.desde,
+                periodoUltimo.hasta
+            )) {
+
+                periodicidadFacturacion =
+                    PeriodicidadFacturacion.NO_MENSUAL;
+
+            } else {
+
+                const anterior = facturaciones[1];
+
+                if (anterior) {
+
+                    const periodoAnterior = anterior.getPeriodo();
+
+                    const anteriorMensual = this.esPeriodoMensual(
+                        periodoAnterior.desde,
+                        periodoAnterior.hasta
+                    );
+
+                    const consecutivas =
+                        periodoAnterior.hasta.getTime() ===
+                        periodoUltimo.desde.getTime();
+
+                    if (anteriorMensual && consecutivas) {
+                        periodicidadFacturacion =
+                            PeriodicidadFacturacion.MENSUAL;
+                    }
+                }
+            }
+        }
+
+        return {
+            detalleFacturacion,
+            periodicidadFacturacion
+        };
+    }
+
+
+
 
     /**
      * Obtiene el detalle económico representativo de una póliza de Mercantil Andina.

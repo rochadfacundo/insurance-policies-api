@@ -330,13 +330,27 @@ export class MercantilCarteraService {
                     detalleEndosoCero = detalle;
                 }
 
-            } catch (error) {
+            } catch (error: unknown) {
                 consultasIncompletas = true;
-
+            
                 console.warn(
-                    `No se pudo consultar el endoso ${endoso} ` +
-                    `de la póliza ${poliza} al analizar facturación.`
+                    `[MERCANTIL] Error consultando endoso ${endoso} ` +
+                    `de la póliza ${poliza}.`
                 );
+            
+                if (axios.isAxiosError(error)) {
+                    console.error("HTTP Status:", error.response?.status);
+                    console.error("Código Axios:", error.code);
+                    console.error("Mensaje:", error.message);
+                    console.error("Respuesta API:", error.response?.data);
+            
+                } else if (error instanceof Error) {
+                    console.error("Mensaje:", error.message);
+                    console.error("Stack:", error.stack);
+            
+                } else {
+                    console.error("Error desconocido:", error);
+                }
             }
         }
 

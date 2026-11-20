@@ -58,7 +58,8 @@ export class FirestorePolizaRepository {
         const datos = this.prepararDocumento(
             poliza,
             fechaCreacion,
-            ahora
+            ahora,
+            documentoActual.get("periodicidadFacturacionManual")
         );
 
         await referencia.set(datos);
@@ -119,7 +120,12 @@ export class FirestorePolizaRepository {
                     ? documentoActual.get("fechaCreacion") ?? ahora
                     : ahora;
     
-            const datos = this.prepararDocumento(poliza, fechaCreacion, ahora);
+            const datos = this.prepararDocumento(
+                poliza,
+                fechaCreacion,
+                ahora,
+                documentoActual.get("periodicidadFacturacionManual")
+            );
     
             batch.set(referencia, datos);
         }
@@ -135,10 +141,20 @@ export class FirestorePolizaRepository {
      *  la póliza en Firestore. 
      * @returns un objeto que contiene los datos de la póliza listos para ser guardados en Firestore. 
      */
-    private prepararDocumento(poliza: Poliza, fechaCreacion: Timestamp,fechaActualizacion: Timestamp): Record<string, unknown> {
+    private prepararDocumento(
+        poliza: Poliza,
+        fechaCreacion: Timestamp,
+        fechaActualizacion: Timestamp,
+        periodicidadManualAnterior?: Poliza["periodicidadFacturacionManual"]
+    ): Record<string, unknown> {
     
         return this.eliminarUndefined<Record<string, unknown>>({
             ...poliza,
+    
+            periodicidadFacturacionManual:
+                periodicidadManualAnterior ??
+                poliza.periodicidadFacturacionManual,
+    
             fechaCreacion,
             fechaActualizacion
         });
@@ -374,12 +390,17 @@ export class FirestorePolizaRepository {
             }
         
             const fechaCreacion = documentoActual.exists
-                    ? documentoActual.get("fechaCreacion") ?? ahora
-                    : ahora;
-        
-            const datos = this.prepararDocumento(riesgoActual,fechaCreacion,ahora);
-        
-            batch.set(referenciaPoliza,datos);
+                ? documentoActual.get("fechaCreacion") ?? ahora
+                : ahora;
+
+            const datos = this.prepararDocumento(
+                riesgoActual,
+                fechaCreacion,
+                ahora,
+                documentoActual.get("periodicidadFacturacionManual")
+            );
+
+            batch.set(referenciaPoliza, datos);
         }
 
         /*
@@ -483,7 +504,12 @@ export class FirestorePolizaRepository {
                     ? documentoExistente.get("fechaCreacion") ?? ahoraTimestamp
                     : ahoraTimestamp;
 
-                const datos = this.prepararDocumento(poliza, fechaCreacion,ahoraTimestamp);
+                const datos = this.prepararDocumento(
+                    poliza,
+                    fechaCreacion,
+                    ahoraTimestamp,
+                    documentoExistente.get("periodicidadFacturacionManual")
+                );
     
                 batch.set(referencia, datos);
             }

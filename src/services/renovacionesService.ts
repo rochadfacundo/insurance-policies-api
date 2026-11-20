@@ -165,24 +165,49 @@ private readonly POLIZAS_MERCANTIL_MENSUALES = new Set([
                 return false;
             }
         
-            // Exclusión temporal de facturaciones mensuales de Mercantil.
-            if (
-                poliza.compania === ECompania.MERCANTIL_ANDINA &&
-                this.POLIZAS_MERCANTIL_MENSUALES.has(
-                    Number(poliza.detallePoliza.numeroPoliza)
-                )
-            ) {
 
-                this.polizasExcluidas.push({
-                    poliza,
-                    motivo: "Facturación mensual Mercantil Andina - exclusión temporal"
-                });
-                console.log(
-                    `[RENOVACIONES] Excluida Mercantil mensual: ${poliza.detallePoliza.numeroPoliza}`
-                );
-        
-                return false;
-            }
+// Excluir pólizas con facturación mensual de Mercantil Andina.
+if (poliza.compania === ECompania.MERCANTIL_ANDINA) {
+
+    const numeroPoliza = Number(
+        poliza.detallePoliza.numeroPoliza
+    );
+
+        // La clasificación manual tiene prioridad sobre la automática.
+        const periodicidad = (
+            poliza.periodicidadFacturacionManual ??
+            poliza.periodicidadFacturacion
+        )
+            ?.trim()
+            .toUpperCase();
+
+    const esMensual = periodicidad === "MENSUAL";
+
+    const estaEnListaTemporal =
+        this.POLIZAS_MERCANTIL_MENSUALES.has(numeroPoliza);
+
+    if (esMensual || estaEnListaTemporal) {
+
+        const motivo = esMensual
+            ? poliza.periodicidadFacturacionManual != null
+                ? "Facturación mensual Mercantil Andina - confirmación manual"
+                : "Facturación mensual Mercantil Andina - periodicidad detectada"
+            : "Facturación mensual Mercantil Andina - lista temporal";
+
+        this.polizasExcluidas.push({
+            poliza,
+            motivo
+        });
+
+        console.log(
+            `[RENOVACIONES] Excluida Mercantil mensual: ` +
+            `${numeroPoliza} - ${motivo}`
+        );
+
+        return false;
+    }
+}
+
         
 // Excluir refacturación mensual de Federación Patronal.
 if (

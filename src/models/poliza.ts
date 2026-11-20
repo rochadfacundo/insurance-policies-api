@@ -44,6 +44,12 @@ export interface Poliza {
   periodicidadFacturacion?: PeriodicidadFacturacion;
 
   /**
+   * Periodicidad confirmada manualmente.
+   * Tiene prioridad sobre la clasificación automática.
+   */
+  periodicidadFacturacionManual?: PeriodicidadFacturacion;
+
+  /**
    * Próxima fecha de refacturación cuando pudo determinarse
    * explícitamente para la compañía.
    */

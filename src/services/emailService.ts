@@ -13,9 +13,9 @@ export class EmailService {
 
         this.emailUser = process.env.EMAIL_USER ?? "";
         this.emailAppPassword = process.env.EMAIL_APP_PASSWORD ?? "";
-
+    
         this.validarConfiguracion();
-
+    
         this.transporter = nodemailer.createTransport({
             service: "gmail",
             auth: {
@@ -167,21 +167,35 @@ export class EmailService {
         `;
 
 
+                
         try {
 
-            await this.transporter.sendMail({
-
-                from:
-                    `"Técnica y Servicios" <${this.emailUser}>`,
-
+            const info = await this.transporter.sendMail({
+                from: `"Técnica y Servicios" <${this.emailUser}>`,
                 to: params.destinatario,
-
                 subject: asunto,
-
                 html,
-
                 attachments
             });
+
+            console.log("[EMAIL] Resultado SMTP:", {
+                destinatario: params.destinatario,
+                messageId: info.messageId,
+                accepted: info.accepted,
+                rejected: info.rejected,
+                response: info.response
+            });
+
+            const destinatarioAceptado = info.accepted.some(
+                email => String(email).toLowerCase() ===
+                    params.destinatario.toLowerCase()
+            );
+
+            if (!destinatarioAceptado) {
+                throw new Error(
+                    `El servidor SMTP no aceptó al destinatario ${params.destinatario}`
+                );
+            }
 
         } catch (error) {
 
@@ -192,6 +206,7 @@ export class EmailService {
 
             throw error;
         }
+
     }
 
 

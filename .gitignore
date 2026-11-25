@@ -97,3 +97,5 @@ tip_deploy.txt
 # credenciales firebase
 # =========================
 credentials/
+# Mercantil audit reports
+scripts/ma/auditoria-*.csv

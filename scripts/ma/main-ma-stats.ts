@@ -1,18 +1,18 @@
-import { obtenerProductoresMercantil } from "../src/companias/mercantil/models/productoresMercantil";
+import { obtenerProductoresMercantil } from "../../src/companias/mercantil/models/productoresMercantil";
 
-import { FirestoreErrorRepository } from "../src/repositories/firebaseErrorRepository";
-import { FirestoreStatsCarteraRepository } from "../src/repositories/firestoreStatsCarteraRepository";
+import { FirestoreErrorRepository } from "../../src/repositories/firebaseErrorRepository";
+import { FirestoreStatsCarteraRepository } from "../../src/repositories/firestoreStatsCarteraRepository";
 
-import { ECompania } from "../src/models/eCompania";
-import { ErrorSincronizacion } from "../src/models/errorSincronizacion";
-import { ErrorProductor } from "../src/models/errorProductor";
-import { Productor } from "../src/models/productor";
-import { StatsCartera } from "../src/models/statsCartera";
+import { ECompania } from "../../src/models/eCompania";
+import { ErrorSincronizacion } from "../../src/models/errorSincronizacion";
+import { ErrorProductor } from "../../src/models/errorProductor";
+import { Productor } from "../../src/models/productor";
+import { StatsCartera } from "../../src/models/statsCartera";
 
-import { formatearDuracion } from "../src/utils/utils";
-import {normalizarError,obtenerMensajeError} from "../src/utils/syncUtils";
+import { formatearDuracion } from "../../src/utils/utils";
+import {normalizarError,obtenerMensajeError} from "../../src/utils/syncUtils";
 
-import { MercantilCarteraStatsService} from "../src/companias/mercantil/services/mercantilStatsService";
+import { MercantilCarteraStatsService} from "../../src/companias/mercantil/services/mercantilStatsService";
 
 
 async function main(): Promise<void> {

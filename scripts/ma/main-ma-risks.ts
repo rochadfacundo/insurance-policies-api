@@ -19,24 +19,24 @@ process.env.GOOGLE_APPLICATION_CREDENTIALS = path.resolve(
 // 2. IMPORTACIONES
 // ======================================================
 
-import { obtenerProductoresMercantil } from "../src/companias/mercantil/models/productoresMercantil";
-import { MercantilSyncService } from "../src/companias/mercantil/services/mercantilSyncService";
+import { obtenerProductoresMercantil } from "../../src/companias/mercantil/models/productoresMercantil";
+import { MercantilSyncService } from "../../src/companias/mercantil/services/mercantilSyncService";
 
-import { FirestorePolizaRepository } from "../src/repositories/firestorePolizaRepository";
-import { FirestoreErrorRepository } from "../src/repositories/firebaseErrorRepository";
+import { FirestorePolizaRepository } from "../../src/repositories/firestorePolizaRepository";
+import { FirestoreErrorRepository } from "../../src/repositories/firebaseErrorRepository";
 
-import { ECompania } from "../src/models/eCompania";
-import { ErrorSincronizacion } from "../src/models/errorSincronizacion";
-import { ErrorProductor } from "../src/models/errorProductor";
-import { ResumenGeneral } from "../src/models/sync";
+import { ECompania } from "../../src/models/eCompania";
+import { ErrorSincronizacion } from "../../src/models/errorSincronizacion";
+import { ErrorProductor } from "../../src/models/errorProductor";
+import { ResumenGeneral } from "../../src/models/sync";
 
-import { formatearDuracion } from "../src/utils/utils";
+import { formatearDuracion } from "../../src/utils/utils";
 
 import {
     mostrarResumen,
     normalizarError,
     obtenerMensajeError
-} from "../src/utils/syncUtils";
+} from "../../src/utils/syncUtils";
 
 // ======================================================
 // 3. PROCESO PRINCIPAL

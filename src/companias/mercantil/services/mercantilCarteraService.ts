@@ -504,4 +504,146 @@ export class MercantilCarteraService {
         );
     }
 
+
+    /**
+     * Obtiene la información económica de una póliza de cartera.
+     *
+     * Contempla pólizas transferidas desde productores externos,
+     * cuyos endosos anteriores a la transferencia no son accesibles.
+     *
+     * No utiliza los importes de una transferencia como referencia
+     * económica de la póliza.
+     *
+     * No realiza escrituras en Firestore.
+     */
+    async analizarFacturacionCartera(
+        poliza: number,
+        endosoActual: number,
+        detalleActual?: MercantilDetallePolizaManager
+    ): Promise<{
+        detalleFacturacion: MercantilDetallePolizaManager | null;
+        periodicidadFacturacion: PeriodicidadFacturacion;
+        transferenciaDetectada: boolean;
+        historialRestringido: boolean;
+    }> {
+
+        const facturaciones: MercantilDetallePolizaManager[] = [];
+
+        let detalleEndosoCero: MercantilDetallePolizaManager | null = null;
+
+        let transferenciaDetectada = false;
+        let historialRestringido = false;
+
+        for (let endoso = endosoActual; endoso >= 0; endoso--) {
+
+            try {
+
+                const detalle = endoso === endosoActual && detalleActual
+                        ? detalleActual
+                        : await this.obtenerDetallePoliza(poliza, endoso);
+
+                const tipo = detalle.getTipo()?.trim().toUpperCase();
+
+                if (tipo === "TRANSFERENCIA") {
+                    transferenciaDetectada = true;
+                }
+
+                if (tipo === "FACTURACION") {
+
+                    facturaciones.push(detalle);
+
+                    if (facturaciones.length === 2) {
+                        break;
+                    }
+                }
+
+                if (endoso === 0 && tipo !== "TRANSFERENCIA") {
+                    detalleEndosoCero = detalle;
+                }
+
+            } catch (error: unknown) {
+
+                const accesoDenegado =
+                    axios.isAxiosError(error) &&
+                    error.response?.status === 403;
+
+                // Una transferencia previamente identificada
+                // permite reconocer la restricción histórica.
+                if (accesoDenegado && transferenciaDetectada) {
+
+                    historialRestringido = true;
+
+                    console.warn(
+                        `[MERCANTIL] Póliza ${poliza}: ` +
+                        `historial restringido desde el endoso ${endoso}.`
+                    );
+
+                    break;
+                }
+
+                // No ocultar errores inesperados.
+                throw error;
+            }
+        }
+
+        const ultimaFacturacion = facturaciones[0];
+
+        const detalleFacturacion = ultimaFacturacion ?? detalleEndosoCero;
+
+        // Si no existe información económica, solamente aceptamos
+        // el resultado cuando identificamos una transferencia
+        // y una restricción de acceso a su historial.
+        if (
+            !detalleFacturacion &&
+            !(transferenciaDetectada && historialRestringido)
+        ) {
+
+            throw new Error(`No se encontró información económica válida ` + `para la póliza ${poliza}.`);
+        }
+
+        let periodicidadFacturacion = PeriodicidadFacturacion.INDETERMINADA;
+
+        if (!historialRestringido && ultimaFacturacion) {
+
+            const periodoUltimo = ultimaFacturacion.getPeriodo();
+
+            if (!this.esPeriodoMensual(
+                periodoUltimo.desde,
+                periodoUltimo.hasta
+            )) {
+
+                periodicidadFacturacion =
+                    PeriodicidadFacturacion.NO_MENSUAL;
+
+            } else {
+
+                const anterior = facturaciones[1];
+
+                if (anterior) {
+
+                    const periodoAnterior = anterior.getPeriodo();
+
+                    const anteriorMensual = this.esPeriodoMensual(
+                        periodoAnterior.desde,
+                        periodoAnterior.hasta
+                    );
+
+                    const consecutivas = periodoAnterior.hasta.getTime() === periodoUltimo.desde.getTime();
+
+                    if (anteriorMensual && consecutivas) {
+
+                        periodicidadFacturacion = PeriodicidadFacturacion.MENSUAL;
+                    }
+                }
+            }
+        }
+
+        return {
+            detalleFacturacion,
+            periodicidadFacturacion,
+            transferenciaDetectada,
+            historialRestringido
+        };
+    }
+
 }

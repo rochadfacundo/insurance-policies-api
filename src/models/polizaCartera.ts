@@ -39,6 +39,9 @@ export interface PolizaCartera {
     cobertura: string | null;
 
     // Información económica
+    
+    moneda: string | null;
+
     primaAnualizada: number | null;
     premioAnualizado: number | null;
 
@@ -55,7 +58,7 @@ export interface PolizaCartera {
     periodicidadFacturacion: PeriodicidadFacturacion;
 
     // Vigencia contractual
-    finVigencia: Date;
+    finVigencia: Date | null;
 
     // Auditoría
     fechaCreacion?: Date;

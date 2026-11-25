@@ -26,6 +26,7 @@ export interface MercantilDetallePoliza {
     };
 
     costo: {
+        moneda?: string | null;
         premio: number;
         prima: number;
         primaRC: number;

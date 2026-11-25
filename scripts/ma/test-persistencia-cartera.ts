@@ -135,9 +135,10 @@ async function main(): Promise<void> {
         );
 
         assert.ok(
-            Number.isFinite(
-                poliza.finVigencia.getTime()
-            )
+            poliza.finVigencia === null ||
+                Number.isFinite(
+                    poliza.finVigencia.getTime()
+                )
         );
 
         assert.equal(

@@ -101,6 +101,8 @@ export class MercantilPolizaCarteraMapper {
                 detalleFacturacion?.getPremioAnualizado()
             ),
 
+            moneda: detalleFacturacion?.getMoneda() ?? null,
+
             endosoEconomico:
                 detalleFacturacion?.getEndoso() ?? null,
 
@@ -128,7 +130,9 @@ export class MercantilPolizaCarteraMapper {
             // VIGENCIA CONTRACTUAL
             // ==========================================
 
-            finVigencia: this.mapearFecha(
+            finVigencia: cartera.finPoliza === null
+            ? null
+            : this.mapearFecha(
                 cartera.finPoliza,
                 "finPoliza"
             )

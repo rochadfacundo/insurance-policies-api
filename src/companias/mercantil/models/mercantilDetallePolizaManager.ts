@@ -78,6 +78,19 @@ export class MercantilDetallePolizaManager {
     }
 
     /**
+     * Devuelve la moneda en la que están expresados
+     * los importes económicos del movimiento.
+     *
+     * Conserva null cuando la compañía no informa la moneda.
+     */
+    getMoneda(): string | null {
+
+        return this.detalle.costo.moneda?.trim().toUpperCase() || null;
+    }
+
+
+
+    /**
      * Obtiene el tipo de movimiento correspondiente al detalle de la póliza.
      *
      * Mercantil utiliza este campo para distinguir, entre otros, la emisión

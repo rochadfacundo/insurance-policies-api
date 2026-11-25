@@ -16,7 +16,7 @@ export interface MercantilPolizasResponse {
     bienAsegurado: string;
     desde: string;      // formato YYYY-MM-DD
     hasta: string;      // formato YYYY-MM-DD
-    finPoliza: string;  // formato YYYY-MM-DD
+    finPoliza: string | null;  // formato YYYY-MM-DD
     endoso: number;
     tipoRenovacion: TipoRenovacionMercantil;
     numeroCliente: number;

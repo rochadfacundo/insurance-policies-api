@@ -8,6 +8,7 @@ import {
 import { PolizaCartera } from "../models/polizaCartera";
 import { ECompania } from "../models/eCompania";
 
+
 export class FirestorePolizaCarteraRepository {
 
     private readonly COLLECTION_NAME = "carteraPolizas";
@@ -246,9 +247,7 @@ export class FirestorePolizaCarteraRepository {
     /**
      * Convierte un documento Firestore al modelo de dominio.
      */
-    private mapearDocumento(
-        documento: DocumentSnapshot
-    ): PolizaCartera {
+    private mapearDocumento(documento: DocumentSnapshot): PolizaCartera {
 
         const datos = documento.data();
 
@@ -265,6 +264,8 @@ export class FirestorePolizaCarteraRepository {
 
             id: documento.id,
 
+            moneda: datos.moneda ?? null,
+
             facturacion: {
 
                 desde: this.convertirFecha(
@@ -276,9 +277,9 @@ export class FirestorePolizaCarteraRepository {
                 )
             },
 
-            finVigencia: this.convertirFecha(
-                datos.finVigencia
-            ),
+            finVigencia: datos.finVigencia === null
+                ? null
+                : this.convertirFecha(datos.finVigencia),
 
             fechaCreacion: datos.fechaCreacion != null
                 ? this.convertirFecha(datos.fechaCreacion)
@@ -290,7 +291,6 @@ export class FirestorePolizaCarteraRepository {
 
         } as PolizaCartera;
     }
-
     /**
      * Convierte Timestamp de Firestore a Date.
      */
@@ -351,4 +351,7 @@ export class FirestorePolizaCarteraRepository {
 
         return resultado;
     }
+
+    
 }
+

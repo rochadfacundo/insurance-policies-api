@@ -24,6 +24,12 @@ export class MercantilPolizaMapper {
     
         const hastaFacturacion = DateUtils.parse(cartera.hasta);
     
+        if (cartera.finPoliza === null) {
+            throw new Error(
+                `[MERCANTIL RIESGOS] Póliza ${cartera.poliza} sin fin de vigencia contractual.`
+            );
+        }
+        
         const hastaVigencia = DateUtils.parse(cartera.finPoliza);
     
     

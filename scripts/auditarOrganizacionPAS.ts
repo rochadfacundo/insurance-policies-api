@@ -20,36 +20,81 @@ interface ProductorAuditoria {
 // ============================================================
 // CONFIGURACIÓN DE LA AUDITORÍA
 // ==========================================================
-const ORGANIZADOR = "BAGALA";
+// ============================================================
+// CONFIGURACIÓN DE LA AUDITORÍA
+// ============================================================
+
+const ORGANIZADOR = "ALFIERI";
 
 const PRODUCTORES: ProductorAuditoria[] = [
     {
-        nombre: "BULACIO",
-        matricula: "109143",
+        nombre: "ALFIERI",
+        matricula: "92331",
         codigos: [
-            { aseguradoraId: "atm", codigo: "14235" },
-            { aseguradoraId: "mercantil-andina", codigo: "17238" },
-            { aseguradoraId: "rio-uruguay", codigo: "17243" }
+            { aseguradoraId: "atm", codigo: "10238" },
+            { aseguradoraId: "rio-uruguay", codigo: "7900" },
+            { aseguradoraId: "rio-uruguay", codigo: "15951" }
         ]
     },
     {
-        nombre: "PETROSILLO",
-        matricula: "72392",
+        nombre: "ALVES",
+        matricula: "53566",
         codigos: [
-            { aseguradoraId: "atm", codigo: "14341" }
+            { aseguradoraId: "rio-uruguay", codigo: "15037" }
         ]
     },
     {
-        nombre: "GUERRERO",
-        matricula: "109722",
+        nombre: "GATICA",
+        matricula: "101781",
         codigos: [
-            { aseguradoraId: "atm", codigo: "14634" },
-            { aseguradoraId: "mercantil-andina", codigo: "17670" },
-            { aseguradoraId: "rio-uruguay", codigo: "17276" }
+            { aseguradoraId: "atm", codigo: "10813" },
+            { aseguradoraId: "rio-uruguay", codigo: "15105" }
+        ]
+    },
+    {
+        nombre: "FLORES",
+        matricula: "101722",
+        codigos: [
+            { aseguradoraId: "atm", codigo: "11223" },
+            { aseguradoraId: "rio-uruguay", codigo: "15550" }
+        ]
+    },
+    {
+        nombre: "GIL",
+        matricula: "38410",
+        codigos: [
+            { aseguradoraId: "rio-uruguay", codigo: "15526" }
+        ]
+    },
+    {
+        nombre: "SALMONE",
+        matricula: "83849",
+        codigos: [
+            { aseguradoraId: "rio-uruguay", codigo: "15524" }
+        ]
+    },
+    {
+        nombre: "GONZALEZ",
+        matricula: null,
+        codigos: [
+            { aseguradoraId: "atm", codigo: "11442" }
+        ]
+    },
+    {
+        nombre: "REY",
+        matricula: "85762",
+        codigos: [
+            { aseguradoraId: "rio-uruguay", codigo: "16717" }
+        ]
+    },
+    {
+        nombre: "ALVES",
+        matricula: "83619",
+        codigos: [
+            { aseguradoraId: "rio-uruguay", codigo: "17460" }
         ]
     }
 ];
-
 // ============================================================
 // NORMALIZACIÓN
 // ============================================================

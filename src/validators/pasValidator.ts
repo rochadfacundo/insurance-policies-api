@@ -79,6 +79,82 @@ const esCodigoAseguradoraValido = (valor: unknown): boolean => {
 
 
 /**
+ * Valida la unicidad de los códigos comerciales dentro
+ * de las vinculaciones de un productor.
+ *
+ * Permite múltiples vinculaciones con una misma aseguradora
+ * siempre que sus códigos comerciales no estén duplicados.
+ *
+ * Un mismo código puede existir en distintas aseguradoras,
+ * dado que cada compañía administra su propia numeración.
+ *
+ * La comparación ignora espacios al inicio y al final
+ * de los códigos y de los identificadores de aseguradora.
+ *
+ * @param valor - Vinculaciones comerciales del productor.
+ * @returns true si todos los códigos son únicos por aseguradora.
+ */
+const tieneCodigosComercialesUnicos = (
+  valor: unknown
+): boolean => {
+
+  if (!Array.isArray(valor)) {
+      return false;
+  }
+
+  const codigosRegistrados = new Map<string, Set<string>>();
+
+  for (const compania of valor) {
+
+      if (!esObjeto(compania)) {
+          return false;
+      }
+
+      const aseguradoraId = compania["aseguradoraId"];
+      const codigos = compania["codigos"];
+
+      if (
+          typeof aseguradoraId !== "string" ||
+          !Array.isArray(codigos)
+      ) {
+          return false;
+      }
+
+      const identificador = aseguradoraId.trim();
+
+      // Cada aseguradora posee su propio conjunto de códigos.
+      const registrados =
+          codigosRegistrados.get(identificador) ??
+          new Set<string>();
+
+      for (const valorCodigo of codigos) {
+
+          if (typeof valorCodigo !== "string") {
+              return false;
+          }
+
+          const codigo = valorCodigo.trim();
+
+          // Un código no puede repetirse dentro de la misma
+          // aseguradora, incluso si posee otro estado comercial.
+          if (registrados.has(codigo)) {
+              return false;
+          }
+
+          registrados.add(codigo);
+      }
+
+      codigosRegistrados.set(
+          identificador,
+          registrados
+      );
+  }
+
+  return true;
+};
+
+
+/**
  * Valida la coherencia de la gestión por organizador.
  */
 const esGestionOrganizativaValida = (valor: Record<string, unknown>): boolean => {
@@ -134,8 +210,10 @@ export const esPASValido = (valor: unknown): valor is PAS => {
 
     esContactoValido(valor["contacto"]) &&
 
+    // Valida la estructura y la integridad de las vinculaciones.
     Array.isArray(valor["companias"]) &&
     valor["companias"].every(esCodigoAseguradoraValido) &&
+    tieneCodigosComercialesUnicos(valor["companias"]) &&
 
     (
       valor["otrasCompanias"] === undefined ||
@@ -155,3 +233,4 @@ export const esPASValido = (valor: unknown): valor is PAS => {
     (typeof valor["filaOrigen"] === "number" && Number.isInteger(valor["filaOrigen"]) && valor["filaOrigen"] > 0))
   );
 };
+

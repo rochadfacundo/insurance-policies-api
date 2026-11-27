@@ -141,15 +141,10 @@ export interface PAS {
   // Relación con aseguradoras
 
   /**
-   * Códigos y situaciones comerciales del PAS
-   * en las distintas aseguradoras.
+   * Vinculaciones comerciales del productor con las aseguradoras.
    *
-   * Un productor puede tener múltiples códigos en una
-   * misma compañía, utilizar subcódigos de Técnica
-   * o trabajar mediante otra organización.
-   *
-   * El estado de cada código es independiente
-   * del estado operativo general del PAS.
+   * Una misma aseguradora puede aparecer en múltiples registros
+   * cuando sus códigos comerciales poseen estados diferentes.
    */
   companias: CodigoAseguradora[];
 

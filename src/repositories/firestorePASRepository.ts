@@ -85,6 +85,81 @@ export class FirestorePASRepository {
     }
 
     /**
+     * Incorpora nuevos PAS a una colección existente.
+     *
+     * Utiliza identificadores previamente definidos y una
+     * operación atómica para evitar escrituras parciales.
+     *
+     * No permite sobrescribir documentos existentes.
+     *
+     * @param productores - Productores a incorporar.
+     * @returns Cantidad de productores creados.
+     */
+    async incorporarProductores(productores: PAS[]): Promise<number> {
+
+        if (productores.length === 0 || productores.length > 500) {
+            throw new Error(
+                "Se requiere entre 1 y 500 productores."
+            );
+        }
+
+        const ids = productores.map(productor => productor.id);
+
+        if (ids.some(id => !id?.trim() || id.includes("/"))) {
+            throw new Error(
+                "Se encontraron identificadores inválidos."
+            );
+        }
+
+        if (new Set(ids).size !== ids.length) {
+            throw new Error(
+                "Se encontraron identificadores duplicados."
+            );
+        }
+
+        for (const productor of productores) {
+
+            const id = productor.id;
+        
+            if (!esPASValido(productor)) {
+                throw new Error(`Estructura inválida para el productor: ${id}`);
+            }
+        }
+
+        const coleccion = this.firestore.collection(this.COLLECTION_NAME);
+        const batch = this.firestore.batch();
+        const fecha = Timestamp.now();
+
+        for (const productor of productores) {
+
+            const referencia = coleccion.doc(productor.id);
+
+            const {
+                id,
+                fechaCreacion,
+                fechaActualizacion,
+                ...datos
+            } = productor;
+
+            batch.create(referencia, {
+                ...datos,
+                fechaCreacion: fecha,
+                fechaActualizacion: fecha
+            });
+        }
+
+        await batch.commit();
+
+        return productores.length;
+    }
+
+
+
+
+
+
+
+    /**
      * Actualiza los datos de un PAS existente.
      *
      * No modifica su fecha de creación.
@@ -184,4 +259,6 @@ async importarInicial(productores: PAS[]): Promise<number> {
 
     return productores.length;
 }
+
+
 }

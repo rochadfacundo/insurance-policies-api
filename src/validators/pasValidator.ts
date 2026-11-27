@@ -7,10 +7,10 @@ const ESTADOS_PAS = ["ACTIVO", "BAJA", "PENDIENTE"];
 
 const TIPOS_GESTION: TipoGestionPAS[] = [
   "EJECUTIVA_ASIGNADA",
+  "GESTIONADO_POR_ORGANIZADOR",
   "AUTOGESTIONADO",
   "SIN_ASIGNAR"
 ];
-
 const ESTADOS_RC: EstadoRC[] = [
   "VIGENTE",
   "NO_TIENE",
@@ -77,6 +77,24 @@ const esCodigoAseguradoraValido = (valor: unknown): boolean => {
   );
 };
 
+
+/**
+ * Valida la coherencia de la gestión por organizador.
+ */
+const esGestionOrganizativaValida = (valor: Record<string, unknown>): boolean => {
+
+  if (valor["tipoGestion"] !== "GESTIONADO_POR_ORGANIZADOR") {
+    return true;
+  }
+
+  return (
+    esTexto(valor["productorSuperiorId"]) &&
+    valor["productorSuperiorId"] !== valor["id"] &&
+    valor["ejecutivaId"] === null
+  );
+};
+
+
 /**
  * Comprueba que un documento recuperado de Firestore
  * tenga la estructura esperada de un PAS.
@@ -128,22 +146,12 @@ export const esPASValido = (valor: unknown): valor is PAS => {
         )
       )
     ) &&
-
     esTextoOpcional(valor["particularidades"]) &&
     esTextoOpcional(valor["productorSuperiorId"]) &&
+    esGestionOrganizativaValida(valor) &&
 
-    (
-      valor["origen"] === "EXCEL" ||
-      valor["origen"] === "MANUAL"
-    ) &&
-
-    (
-      valor["filaOrigen"] === undefined ||
-      (
-        typeof valor["filaOrigen"] === "number" &&
-        Number.isInteger(valor["filaOrigen"]) &&
-        valor["filaOrigen"] > 0
-      )
-    )
+    (valor["origen"] === "EXCEL" || valor["origen"] === "MANUAL") &&
+    (valor["filaOrigen"] === undefined ||
+    (typeof valor["filaOrigen"] === "number" && Number.isInteger(valor["filaOrigen"]) && valor["filaOrigen"] > 0))
   );
 };

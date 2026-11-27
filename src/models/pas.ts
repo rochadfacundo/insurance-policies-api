@@ -16,6 +16,7 @@ export type EstadoPAS = | "ACTIVO" | "BAJA" | "PENDIENTE";
  */
 export type TipoGestionPAS =
   | "EJECUTIVA_ASIGNADA"
+  | "GESTIONADO_POR_ORGANIZADOR"
   | "AUTOGESTIONADO"
   | "SIN_ASIGNAR";
 
@@ -166,10 +167,15 @@ export interface PAS {
   // Relaciones entre productores
 
   /**
-   * ID de otro PAS con el que mantiene una relación
-   * jerárquica o comercial de dependencia.
+   * ID del PAS con el que mantiene una relación
+   * jerárquica dentro de una organización.
    *
-   * Reservado para futuras funcionalidades.
+   * Cuando el tipo de gestión es GESTIONADO_POR_ORGANIZADOR,
+   * identifica al productor responsable de su gestión.
+   *
+   * La pertenencia a una organización no implica
+   * necesariamente que el PAS sea atendido por ella:
+   * puede tener una ejecutiva asignada directamente.
    */
   productorSuperiorId?: string | null;
 

@@ -1,4 +1,12 @@
-
+/**
+ * SCRIPT HISTÓRICO DE IMPORTACIÓN INICIAL.
+ *
+ * Diseñado exclusivamente para la asignación de ejecutivas
+ * de los 312 PAS provenientes de la agenda original.
+ *
+ * No utilizar para nuevas altas, cambios de ejecutivas
+ * ni migraciones de organizaciones.
+ */
 import * as fs from "fs";
 import * as path from "path";
 
@@ -29,6 +37,18 @@ interface CambioPropuesto {
   tipoGestionNuevo: TipoGestionPAS;
 }
 
+
+/**
+ * SCRIPT HISTÓRICO DE AUDITORÍA DE IMPORTACIÓN INICIAL.
+ *
+ * Contrasta los 312 productores originales de Firestore
+ * con el reporte generado durante la importación del Excel.
+ *
+ * No representa una auditoría general del estado actual
+ * de los productores.
+ *
+ * Modo exclusivamente de lectura.
+ */
 const ARCHIVO = path.resolve(
   __dirname,
   "resultado-importacion-pas.json"
@@ -40,6 +60,7 @@ const TOTAL_ESPERADO = 312;
 
 const DISTRIBUCION_ESPERADA: Record<TipoGestionPAS, number> = {
   EJECUTIVA_ASIGNADA: 310,
+  GESTIONADO_POR_ORGANIZADOR: 0,
   AUTOGESTIONADO: 1,
   SIN_ASIGNAR: 1
 };
